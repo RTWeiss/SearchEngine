@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Dashboard</title>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Sitemap Indexing Status</h1>
+
+      <div class="cards-row">
+        <div class="card">
+          <h2 class="card-title">Summary</h2>
+          <!-- Display total indexed pages -->
+          <p>Total Indexed Pages: {{ total_pages }}</p>
+
+          <!-- Display total searches -->
+          <p>Total Searches: {{ total_searches }}</p>
+        </div>
+
+        <!-- Display top 10 popular search queries -->
+        <div class="card top-queries-card">
+          <h2 class="card-title">Top 10 Search Queries:</h2>
+          <div class="two-columns">
+            <ul class="queries-list">
+              {% for query, frequency in top_search_queries_first_half %}
+              <li>{{ query }}: {{ frequency }}</li>
+              {% endfor %}
+            </ul>
+            <ul class="queries-list">
+              {% for query, frequency in top_search_queries_second_half %}
+              <li>{{ query }}: {{ frequency }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          <a href="{{ url_for('all_search_queries') }}" class="btn"
+            >View All Queries</a
+          >
+        </div>
+      </div>
+      <div class="card">
+        <h2 class="card-title">Sitemap Status</h2>
+        <table class="sitemap-table">
+          <tr>
+            <th>Sitemap URL</th>
+            <th>Status</th>
+            <th>Total URLs</th>
+            <th>Indexed URLs</th>
+            <th>Actions</th>
+          </tr>
+          {% for sitemap_url, data in sitemap_status.items() %}
+          <tr>
+            <td class="sitemap-url">{{ sitemap_url }}</td>
+            <td>{{ data['status'] }}</td>
+            <td><center>{{ data['total_urls'] }}</center></td>
+            <td><center>{{ data['indexed_urls'] }}</center></td>
+            <td>
+              <!-- Delete button -->
+              <a
+                href="{{ url_for('delete_sitemap', sitemap_url=sitemap_url|urlencode) }}"
+                class="btn"
+                >Delete</a
+              >
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    <footer>
+      <a href="/">Home</a>
+      <a href="/submit">Submit a Sitemap</a>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Search Engine</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+  </head>
+  </head>
+  <body>
+    <div class="container">
+     <center> <h1>Search</h1></center>
+      <form action="/" method="post">
+        <input type="text" name="query" placeholder="Search the web">
+        <input type="submit" value="Search">
+      </form>
+    </div>
+    <footer>
+      <a href="/">Home</a>
+      <a href="/submit">Submit a Sitemap</a>
+      <a href="/dashboard">Dashboard</a>
+      <!-- Add more links as needed -->
+    </footer>
+  </body>
+</html>

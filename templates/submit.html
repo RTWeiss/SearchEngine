@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Submit a Sitemap</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  </head>
+  <body>
+    <div class="container">
+    <center><h1>Submit a Sitemap</h1></center>
+    <form method="POST">
+      <input type="text" name="sitemap_url" required placeholder="Enter sitemap URL">
+      <input type="submit" value="Submit">
+    </form>
+    <center>
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+        <div class="alert alert-info">
+            {{ messages[0] }}
+        </div>
+    {% endif %}
+    {% endwith %}
+    <p></p>
+    <a href="/">Back to Search</a></center>
+    </div>
+    <footer>
+      <a href="/">Home</a>
+      <a href="/dashboard">Dashboard</a>
+      <!-- Add more links as needed -->
+    </footer>
+  </body>
+</html>

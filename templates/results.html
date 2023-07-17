@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Search Results</title>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css"
+    />
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick-theme.css"
+    />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.min.js"></script>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <header></header>
+    <div class="container">
+      <form action="/" method="post">
+        <input
+          type="text"
+          name="query"
+          placeholder="Search the web"
+          value="{{ query }}"
+        />
+        <input type="submit" value="Search" />
+      </form>
+    </div>
+    <div class="container">
+      <h2>Images</h2>
+      <div class="carousel">
+        {% for url, data in results.items() %} {% if data['type'] == 'image' %}
+        <div class="slide">
+          <a href="{{ url }}">
+            <img
+              class="carousel-image"
+              src="{{ url }}"
+              alt="{{ data['title'] }}"
+            />
+          </a>
+        </div>
+        {% endif %} {% endfor %}
+      </div>
+    </div>
+    <div class="container">
+      <h2>Webpages</h2>
+      <ul class="search-results">
+        {% for url, data in results.items() %} {% if data['type'] == 'webpage'
+        %}
+        <li>
+          <a class="title-link" href="{{ url }}">{{ data['title']}}</a>
+          <div class="url">{{ url}}</div>
+          <p>{{ data['description']}}</p>
+        </li>
+        {% endif %} {% endfor %}
+      </ul>
+
+      {% for url, data in results.items() %} {% if url.endswith('.pdf') %}
+      <h2>Files</h2>
+      <ul class="search-results">
+        <li>
+          <a class="title-link" href="{{ url}}">{{ data['title'] }}</a>
+          <div class="url">{{ url}}</div>
+          <p>{{ data['description']}}</p>
+        </li>
+      </ul>
+      {% endif %} {% endfor %}
+    </div>
+
+    <footer>
+      <a href="/">Home</a>
+      <a href="/submit">Submit a Sitemap</a>
+      <a href="/dashboard">Dashboard</a>
+    </footer>
+  </body>
+</html>
+
+<script type="text/javascript">
+  $(document).ready(function () {
+    $(".carousel").slick({
+      infinite: true,
+      slidesToShow: 3,
+      slidesToScroll: 1,
+      dots: false, // Changed to false to disable dots
+      adaptiveHeight: true,
+    });
+  });
+</script>

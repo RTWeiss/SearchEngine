@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>All Search Queries</title>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <h1>All Search Queries</h1>
+
+      <div class="card">
+        <ul>
+          {% for query, frequency in all_search_queries.items() %}
+          <li>{{ query }}: {{ frequency }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <a href="{{ url_for('dashboard') }}" class="btn">Back to Dashboard</a>
+    </div>
+
+    <footer>
+      <a href="/">Home</a>
+      <a href="/submit">Submit a Sitemap</a>
+    </footer>
+  </body>
+</html>

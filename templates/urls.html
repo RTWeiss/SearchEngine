@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Indexed URLs</title>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <h1>Indexed URLs</h1>
+    <ul>
+      {% for url, data in index.items() %}
+      <li>
+        <h2>{{ url }}</h2>
+        <p>Title: {{ data['title'] }}</p>
+        <p>Description: {{ data['description'] }}</p>
+        <p>Type: {{ data['type'] }}</p>
+      </li>
+      {% endfor %}
+    </ul>
+  </body>
+</html>
