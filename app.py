@@ -109,10 +109,17 @@ def index_sitemap(sitemap_url):
             except Exception as e:
                 logging.error(f"Error occurred while indexing URL {url}: {e}", exc_info=True)
 
+            # Update the SubmittedSitemap record
+            sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
+            if sitemap:
+                sitemap.indexed_urls += 1
+                db.session.commit()
+
     CURRENTLY_INDEXING -= 1
     SITEMAP_STATUS[sitemap_url]['status'] = 'Indexing finished'
 
     process_sitemap_queue()
+
 
 def get_urls_from_sitemap(sitemap_url):
     response = requests.get(sitemap_url)
