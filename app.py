@@ -48,9 +48,6 @@ class SubmittedSitemap(db.Model):
     indexed_urls = db.Column(db.Integer, nullable=True)
 
 class IndexedURL(db.Model):
-    __tablename__ = 'indexed_url'
-    __table_args__ = {'extend_existing': True}
-
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.String(500), nullable=False)
     title = db.Column(db.String(500), nullable=True)  # Added title column
