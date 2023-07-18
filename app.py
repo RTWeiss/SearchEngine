@@ -22,7 +22,7 @@ TOTAL_INDEXED_PAGES = 0  # variable to keep track of the total number of pages i
 TOTAL_SEARCHES = 0  # variable to keep track of the total number of searches
 SEARCH_QUERIES = {}  # dictionary to keep track of each search query along with its frequency
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgres://objskwxzxzuvdd:a7c3fa0a58658cb7b21dc6dae288945d6553533a378259af35abd16d707beb09@ec2-34-226-11-94.compute-1.amazonaws.com:5432/dbsdd3r2uu4alq'  # Update with your Heroku Postgres connection details
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://objskwxzxzuvdd:a7c3fa0a58658cb7b21dc6dae288945d6553533a378259af35abd16d707beb09@ec2-34-226-11-94.compute-1.amazonaws.com:5432/dbsdd3r2uu4alq'  # Update with your Heroku Postgres connection details
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
