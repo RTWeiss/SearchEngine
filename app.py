@@ -109,7 +109,6 @@ def process_sitemap_queue():
         indexing_thread.start()
         CURRENTLY_INDEXING += 1
 
-
 def index_sitemap(sitemap_url):
     global CURRENTLY_INDEXING, TOTAL_INDEXED_PAGES, INDEX
     index = 0  # Variable to keep track of the index count
@@ -155,7 +154,7 @@ def index_sitemap(sitemap_url):
                             "type": url_type
                         }
 
-                        with db.session.begin(subtransactions=True):
+                        with db.session.begin():  # Remove subtransactions=True
                             if url in INDEX:
                                 if INDEX[url] != new_data:
                                     INDEX[url] = new_data
@@ -180,11 +179,11 @@ def index_sitemap(sitemap_url):
                                 indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
                                 db.session.add(indexed_url)
                 
-                        db.session.commit()
-                        index += 1  # Increment the index count for each URL processed
+                db.session.commit()
+                index += 1  # Increment the index count for each URL processed
 
-                    except Exception as e:
-                        print(f"Error occurred while indexing URL {url}: {e}")
+        except Exception as e:
+            print(f"Error occurred while indexing URL {url}: {e}")
 
         finally:
             CURRENTLY_INDEXING -= 1
