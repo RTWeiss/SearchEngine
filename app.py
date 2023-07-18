@@ -87,13 +87,16 @@ def search():
         # Pick a random URL for the ad
         ad_url = None
         while ad_url is None or results[ad_url]['type'] == 'image':
+         if results:
             ad_url = random.choice(list(results.keys()))
+            ad = {
+                'title': results[ad_url]['title'],
+                'url': ad_url,
+                'description': results[ad_url]['description']
+            }
+        else:
+            ad = {}
 
-        ad = {
-            'title': results[ad_url]['title'],
-            'url': ad_url,
-            'description': results[ad_url]['description']
-        }
 
     if request.method == 'POST':
         return render_template('results.html', query=query, results=results, ad=ad)
