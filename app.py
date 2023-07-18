@@ -31,6 +31,14 @@ class SearchQuery(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     query = db.Column(db.String(500))
 
+class SubmittedSitemap(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.String(500), nullable=False)
+    indexing_status = db.Column(db.String(100), nullable=False)
+    status = db.Column(db.String(100), nullable=False)
+    total_urls = db.Column(db.Integer, nullable=False)
+    indexed_urls = db.Column(db.Integer, nullable=True)
+
 with app.app_context():
     db.create_all()
 
@@ -49,14 +57,14 @@ def search():
         db.session.add(new_query)
         db.session.commit()
 
+        # For every url in the database, check if the query is in the title, description, or url
         results = {
-            url: {**data, 'title': escape(data['title']), 'description': escape(data['description'])}
-            for url, data in INDEX.items()
-            if query in data['title'].lower() or query in url.lower() or query in data['description'].lower()
+            url.url: {**pickle.loads(url.indexed_data), 'title': escape(pickle.loads(url.indexed_data)['title']), 'description': escape(pickle.loads(url.indexed_data)['description'])}
+            for url in IndexedURL.query.all()
+            if query in pickle.loads(url.indexed_data)['title'].lower() or query in url.url.lower() or query in pickle.loads(url.indexed_data)['description'].lower()
         }
         return render_template('results.html', query=query, results=results)
     return render_template('search.html')
-
 
 def process_sitemap_queue():
     global CURRENTLY_INDEXING
@@ -111,12 +119,14 @@ def index_url(url):
     except Exception as e:
         logging.error(f"Failed to index URL: {url}", exc_info=True)
 
+
 @app.route("/submit", methods=["GET", "POST"])
 def submit():
     if request.method == "POST":
         sitemap_url = request.form["sitemap_url"]
-        SITEMAP_QUEUE.put(sitemap_url)
-        SITEMAP_STATUS[sitemap_url] = 'Added to queue'
+        new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='Added to queue', status='Not started', total_urls=0, indexed_urls=0)
+        db.session.add(new_sitemap)
+        db.session.commit()
         process_sitemap_queue()
         flash("Sitemap submitted successfully.")
         return redirect(url_for('submit'))  # Redirect back to the same page
@@ -125,7 +135,7 @@ def submit():
 
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
-    return render_template("dashboard.html", sitemap_status=SITEMAP_STATUS)
+    return render_template("dashboard.html", sitemaps=SubmittedSitemap.query.all())
 
 @app.route("/urls", methods=["GET"])
 def urls():
@@ -134,7 +144,7 @@ def urls():
 @app.route('/all_search_queries', methods=['GET'])
 def all_search_queries():
     # Retrieving all search queries from the database
-    queries = SearchQuery.query.order_by(SearchQuery.timestamp.desc()).all()
+    queries = SearchQuery.query.order_by(SearchQuery.id.desc()).all()
     return render_template('all_search_queries.html', queries=queries)
 
 @app.route('/delete_sitemap')
