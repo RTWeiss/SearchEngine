@@ -6,7 +6,7 @@ setup(
     packages=['your-app-package'],
     include_package_data=True,
     install_requires=[
-        'flask==2.0.2',
+        'flask==2.1.2',
         'bs4==0.0.1',
         'requests==2.26.0',
         'threading==4.5.3',
