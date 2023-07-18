@@ -17,6 +17,11 @@ import random
 from models import db, IndexedURL
 from datetime import datetime
 
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
@@ -25,7 +30,7 @@ INDEX = {}
 SITEMAP_STATUS = {}
 
 # Using environment variable for the database URL
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
