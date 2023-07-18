@@ -132,8 +132,20 @@ def get_urls_from_sitemap(sitemap_url):
         url_tags = sitemap_soup.find_all("url")
         urls.extend([url.loc.string for url in url_tags])
 
-    return urls
+    # Handle case where sitemap contains links to other .xml files
+    # Assuming these links are in <loc> tags
+    xml_loc_tags = soup.find_all("loc")
+    for xml_url in xml_loc_tags:
+        # Checking if the url is of an xml file
+        if xml_url.text.endswith('.xml'):
+            # Make a request to the xml file
+            xml_response = requests.get(xml_url.text)
+            xml_soup = BeautifulSoup(xml_response.text, "xml")
+            # Extract all urls from the xml file
+            xml_url_tags = xml_soup.find_all("loc")
+            urls.extend([url.string for url in xml_url_tags])
 
+    return urls
 
 def index_url(url, sitemap):
     try:
