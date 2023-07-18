@@ -17,6 +17,7 @@ import psycopg2
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
+INDEX = 0
 SITEMAP_STATUS = {}
 TOTAL_INDEXED_PAGES = 0  # variable to keep track of the total number of pages indexed
 TOTAL_SEARCHES = 0  # variable to keep track of the total number of searches
@@ -111,6 +112,7 @@ def process_sitemap_queue():
 
 def index_sitemap(sitemap_url):
     global CURRENTLY_INDEXING, TOTAL_INDEXED_PAGES, INDEX
+    INDEX += 1
     SITEMAP_STATUS[sitemap_url] = {'status': 'Indexing started...'}
 
     try:
