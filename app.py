@@ -1,6 +1,6 @@
 import os
 import pickle
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, current_app
 from bs4 import BeautifulSoup
 import requests
 import threading
@@ -13,8 +13,6 @@ import urllib.parse
 import random
 from models import db, IndexedURL
 import psycopg2
-from flask import current_app
-from models import db, IndexedURL
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -27,7 +25,7 @@ SEARCH_QUERIES = {}  # dictionary to keep track of each search query along with 
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://objskwxzxzuvdd:a7c3fa0a58658cb7b21dc6dae288945d6553533a378259af35abd16d707beb09@ec2-34-226-11-94.compute-1.amazonaws.com:5432/dbsdd3r2uu4alq'  # Update with your Heroku Postgres connection details
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
+db.init_app(app)
 
 SITEMAP_QUEUE = queue.Queue()
 MAX_SIMULTANEOUS_INDEXING = 5
@@ -117,7 +115,7 @@ def index_sitemap(sitemap_url):
     index = 0  # Variable to keep track of the index count
     SITEMAP_STATUS[sitemap_url] = {'status': 'Indexing started...'}
 
-    with current_app.app_context():  # Set up the application context
+    with app.app_context():  # Set up the application context
         try:
             response = requests.get(sitemap_url)
             soup = BeautifulSoup(response.text, "html.parser")  # Use html.parser as the parser library
@@ -156,30 +154,31 @@ def index_sitemap(sitemap_url):
                             "description": description,
                             "type": url_type
                         }
-                with db.session.begin(subtransactions=True):
-                    if url in INDEX:
-                        if INDEX[url] != new_data:
-                            INDEX[url] = new_data
-                            TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
-                            SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
-                            print(f"Updated index for URL {url}")
 
-                            indexed_url = IndexedURL.query.filter_by(url=url).first()
-                            if indexed_url:
-                                indexed_url.title = title
-                                indexed_url.description = description
-                                indexed_url.type = url_type
+                        with db.session.begin(subtransactions=True):
+                            if url in INDEX:
+                                if INDEX[url] != new_data:
+                                    INDEX[url] = new_data
+                                    TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
+                                    SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
+                                    print(f"Updated index for URL {url}")
+
+                                    indexed_url = IndexedURL.query.filter_by(url=url).first()
+                                    if indexed_url:
+                                        indexed_url.title = title
+                                        indexed_url.description = description
+                                        indexed_url.type = url_type
+                                    else:
+                                        indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
+                                        db.session.add(indexed_url)
                             else:
+                                INDEX[url] = new_data
+                                TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
+                                SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
+                                print(f"Added URL {url} to index")
+
                                 indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
                                 db.session.add(indexed_url)
-                    else:
-                        INDEX[url] = new_data
-                        TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
-                        SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
-                        print(f"Added URL {url} to index")
-
-                        indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
-                        db.session.add(indexed_url)
                 
                 db.session.commit()
                 index += 1  # Increment the index count for each URL processed
