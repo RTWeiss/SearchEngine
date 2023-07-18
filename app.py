@@ -3,11 +3,13 @@ import re
 import threading
 import random
 import requests
+import queue
 from urllib.parse import urljoin, urlparse
 from flask import Flask, render_template, request, redirect, url_for, flash
 from bs4 import BeautifulSoup
 from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
+from html import escape
 
 load_dotenv()
 
@@ -49,6 +51,8 @@ except Exception as e:
     print(f"Error occurred while creating tables: {e}")
 
 SITEMAP_QUEUE = queue.Queue()
+SITEMAP_STATUS = {}
+INDEX = {}
 MAX_SIMULTANEOUS_INDEXING = 5
 CURRENTLY_INDEXING = 0
 
