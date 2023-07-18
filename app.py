@@ -14,7 +14,7 @@ from werkzeug.utils import escape
 from urllib.parse import urljoin, urlparse
 import urllib.parse
 import random
-from models import db, IndexedURL
+from models import db
 from datetime import datetime
 
 DATABASE_URL = os.getenv('DATABASE_URL')
