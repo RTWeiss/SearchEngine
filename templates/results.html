@@ -1,8 +1,25 @@
-<!-- Simplified results.html -->
 <!DOCTYPE html>
 <html>
   <head>
     <title>Search Results</title>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css"
+    />
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick-theme.css"
+    />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.min.js"></script>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="{{ url_for('static', filename='results.css') }}"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
   </head>
   <body>
     <div class="container">
@@ -35,3 +52,15 @@
     </footer>
   </body>
 </html>
+
+<script type="text/javascript">
+  $(document).ready(function () {
+    $(".carousel").slick({
+      infinite: true,
+      slidesToShow: 3,
+      slidesToScroll: 1,
+      dots: false, // Changed to false to disable dots
+      adaptiveHeight: true,
+    });
+  });
+</script>
