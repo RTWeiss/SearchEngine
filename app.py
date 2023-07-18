@@ -99,13 +99,18 @@ def index_sitemap(sitemap_url):
     SITEMAP_STATUS[sitemap_url]['total_urls'] = len(urls)
     logging.info(f'Found {len(urls)} URLs in sitemap: {sitemap_url}')
 
+    sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
+    if sitemap:
+        sitemap.total_urls = len(urls)
+        db.session.commit()
+
     for url in urls:
         if sitemap_url not in SITEMAP_STATUS:
             logging.info(f"Stopped indexing for deleted sitemap: {sitemap_url}")
             return
         else:
             try:
-                index_url(url)
+                index_url(url, sitemap)  # Pass the sitemap to the index_url function
             except Exception as e:
                 logging.error(f"Error occurred while indexing URL {url}: {e}", exc_info=True)
 
@@ -120,7 +125,8 @@ def get_urls_from_sitemap(sitemap_url):
     urls = [loc.text for loc in soup.find_all("loc")]
     return urls
 
-def index_url(url):
+
+def index_url(url, sitemap):
     try:
         res = requests.get(url)
         page_soup = BeautifulSoup(res.text, "html.parser")
@@ -132,6 +138,11 @@ def index_url(url):
         new_indexed_url = IndexedURL(url=url, title=title, description=description)
         db.session.add(new_indexed_url)
         db.session.commit()
+
+        # Update the SubmittedSitemap table to reflect the indexing
+        if sitemap:
+            sitemap.indexed_urls = sitemap.indexed_urls + 1 if sitemap.indexed_urls else 1
+            db.session.commit()
     except Exception as e:
         logging.error(f"Failed to index URL: {url}", exc_info=True)
 
