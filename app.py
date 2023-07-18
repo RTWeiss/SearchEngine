@@ -135,7 +135,11 @@ def submit():
 
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
-    return render_template("dashboard.html", sitemaps=SubmittedSitemap.query.all())
+    try:
+        return render_template("dashboard.html", sitemaps=SubmittedSitemap.query.all())
+    except Exception as e:
+        logging.error(f"An error occurred while loading the dashboard: {e}", exc_info=True)
+        return str(e), 500  # return the exception message for debugging
 
 @app.route("/urls", methods=["GET"])
 def urls():
