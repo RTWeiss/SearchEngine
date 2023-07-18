@@ -166,9 +166,13 @@ def dashboard():
             for sitemap in submitted_sitemaps
         }
 
-        # Fetch recent search queries
-        search_queries = SearchQuery.query.order_by(SearchQuery.timestamp.desc()).limit(10).all()
-
+        # Limit the results to top 10 and order by frequency
+        search_queries = (db.session.query(SearchQuery.search_term, func.sum(SearchQuery.frequency))
+                      .group_by(SearchQuery.search_term)
+                      .order_by(func.sum(SearchQuery.frequency).desc())
+                      .limit(10)
+                      .all())
+        
         # Calculate total_pages and total_searches
         total_pages = sum([sitemap.total_urls for sitemap in submitted_sitemaps])
         total_searches = SearchQuery.query.count()
