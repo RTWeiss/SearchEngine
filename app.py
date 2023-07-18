@@ -14,6 +14,7 @@ import random
 from models import db, IndexedURL
 import psycopg2
 from flask import current_app
+from models import db, IndexedURL
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -155,44 +156,43 @@ def index_sitemap(sitemap_url):
                             "description": description,
                             "type": url_type
                         }
-
-                        if url in INDEX:
-                            if INDEX[url] != new_data:
-                                INDEX[url] = new_data
-                                index += 1  # Increment the index count
-                                TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
-                                SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
-                                print(f"Updated index for URL {url}")
-
-                                indexed_url = IndexedURL.query.filter_by(url=url).first()
-                                if indexed_url:
-                                    indexed_url.title = title
-                                    indexed_url.description = description
-                                    indexed_url.type = url_type
-                                else:
-                                    indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
-                                    db.session.add(indexed_url)
-                        else:
+                with db.session.begin(subtransactions=True):
+                    if url in INDEX:
+                        if INDEX[url] != new_data:
                             INDEX[url] = new_data
-                            index += 1  # Increment the index count
                             TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
                             SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
-                            print(f"Added URL {url} to index")
+                            print(f"Updated index for URL {url}")
 
-                            indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
-                            db.session.add(indexed_url)
+                            indexed_url = IndexedURL.query.filter_by(url=url).first()
+                            if indexed_url:
+                                indexed_url.title = title
+                                indexed_url.description = description
+                                indexed_url.type = url_type
+                            else:
+                                indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
+                                db.session.add(indexed_url)
+                    else:
+                        INDEX[url] = new_data
+                        TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
+                        SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
+                        print(f"Added URL {url} to index")
 
-                        db.session.commit()
+                        indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
+                        db.session.add(indexed_url)
+                
+                db.session.commit()
+                index += 1  # Increment the index count for each URL processed
 
-                    except Exception as e:
-                        print(f"Error occurred while indexing URL {url}: {e}")
+        except Exception as e:
+            print(f"Error occurred while indexing URL {url}: {e}")
 
         finally:
-                CURRENTLY_INDEXING -= 1
-                SITEMAP_STATUS[sitemap_url]['status'] = 'Indexing finished'
-                SITEMAP_STATUS[sitemap_url]['indexed_count'] = index  # Set the indexed count for the sitemap URL
+            CURRENTLY_INDEXING -= 1
+            SITEMAP_STATUS[sitemap_url]['status'] = 'Indexing finished'
+            SITEMAP_STATUS[sitemap_url]['indexed_count'] = index  # Set the indexed count for the sitemap URL
 
-                process_sitemap_queue()
+            process_sitemap_queue()
 
 @app.route("/submit", methods=["GET", "POST"])
 def submit():
