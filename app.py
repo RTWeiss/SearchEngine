@@ -109,6 +109,16 @@ def dashboard():
 def urls():
     return render_template("urls.html", index=INDEX)
 
+@app.route('/all_search_queries', methods=['GET'])
+def all_search_queries():
+    # Retrieving all search queries from the database
+    # queries = ... (your code to get the data)
+    
+    # For the sake of example, let's create a mock list of queries
+    queries = ['query 1', 'query 2', 'query 3']
+
+    return render_template('all_search_queries.html', queries=queries)
+
 @app.route('/delete_sitemap')
 def delete_sitemap():
     sitemap_url = request.args.get('sitemap_url')
