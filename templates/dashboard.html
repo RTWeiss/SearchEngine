@@ -33,13 +33,11 @@
               <tr>
                   <th>Query</th>
                   <th>Frequency</th>
-                  <th>Timestamp</th>
               </tr>
-              {% for query in search_queries %}
+              {% for term, frequency in search_queries %}
               <tr>
                   <td>{{ query.search_term }}</td> 
                   <td>{{ query.frequency }}</td>
-                  <td>{{ query.timestamp }}</td>
               </tr>
               {% endfor %}
           </table>
