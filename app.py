@@ -118,8 +118,22 @@ def index_sitemap(sitemap_url):
 def get_urls_from_sitemap(sitemap_url):
     response = requests.get(sitemap_url)
     soup = BeautifulSoup(response.text, "xml")
-    urls = [loc.text for loc in soup.find_all("loc")]
+    urls = []
+
+    # Handle normal sitemap with <url> tags
+    url_tags = soup.find_all("url")
+    urls.extend([url.loc.string for url in url_tags])
+
+    # Handle sitemap index files with <sitemap> tags
+    sitemap_tags = soup.find_all("sitemap")
+    for sitemap in sitemap_tags:
+        sitemap_response = requests.get(sitemap.loc.string)
+        sitemap_soup = BeautifulSoup(sitemap_response.text, "xml")
+        url_tags = sitemap_soup.find_all("url")
+        urls.extend([url.loc.string for url in url_tags])
+
     return urls
+
 
 def index_url(url, sitemap):
     try:
