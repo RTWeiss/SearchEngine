@@ -170,7 +170,8 @@ def index_url(url, sitemap):
 def submit():
     if request.method == "POST":
         sitemap_url = request.form["sitemap_url"]
-        new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='Added to queue', status='Not started', total_urls=0, indexed_urls=0)
+        total_urls = len(get_urls_from_sitemap(sitemap_url)) # get total urls at this point
+        new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='Added to queue', status='Not started', total_urls=total_urls, indexed_urls=0)
         db.session.add(new_sitemap)
         db.session.commit()
         SITEMAP_QUEUE.put(sitemap_url)
