@@ -89,9 +89,10 @@ def index_sitemap(sitemap_url):
 
     sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
     if sitemap:
-        sitemap.total_urls = len(urls)
-        sitemap.indexing_status = 'Indexing'  # update status to indexing
-        db.session.commit()
+        with lock:
+            sitemap.total_urls = len(urls)
+            sitemap.indexing_status = 'Indexing'  # update status to indexing
+            db.session.commit()
 
     for url in urls:
         try:
@@ -99,12 +100,13 @@ def index_sitemap(sitemap_url):
         except Exception as e:
             logging.error(f"Error occurred while indexing URL {url}: {e}", exc_info=True)
 
-    CURRENTLY_INDEXING -= 1
+    with lock:
+        CURRENTLY_INDEXING -= 1
 
-    # After finishing indexing update status of sitemap
-    if sitemap:
-        sitemap.indexing_status = 'Completed'  # update status to completed
-        db.session.commit()
+        # After finishing indexing update status of sitemap
+        if sitemap:
+            sitemap.indexing_status = 'Completed'  # update status to completed
+            db.session.commit()
 
     process_sitemap_queue()
 
@@ -128,8 +130,9 @@ def index_url(url, sitemap):
         db.session.commit()
 
         if sitemap:
-            sitemap.indexed_urls = sitemap.indexed_urls + 1 if sitemap.indexed_urls else 1
-            db.session.commit()
+            with lock:
+                sitemap.indexed_urls = sitemap.indexed_urls + 1 if sitemap.indexed_urls else 1
+                db.session.commit()
     except Exception as e:
         logging.error(f"Failed to index URL: {url}", exc_info=True)
 
