@@ -31,6 +31,8 @@ class SearchQuery(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     query = db.Column(db.String(500))
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    frequency = db.Column(db.Integer, default=1)  # Add this line
+
 
 class SubmittedSitemap(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -53,9 +55,17 @@ logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(level
 def search():
     if request.method == 'POST':
         query = request.form.get('query').lower()
-        new_query = SearchQuery(query=query)
-        db.session.add(new_query)
-        db.session.commit()
+        # Check if the query exists already
+        existing_query = SearchQuery.query.filter_by(query=query).first()
+        if existing_query:
+            # If it exists, increment the frequency
+            existing_query.frequency += 1
+            db.session.commit()
+        else:
+            # If it doesn't exist, create a new one
+            new_query = SearchQuery(query=query)
+            db.session.add(new_query)
+            db.session.commit()
 
         results = IndexedURL.query.filter(
             IndexedURL.url.contains(query) |
@@ -64,6 +74,7 @@ def search():
         ).all()
         return render_template('results.html', query=query, results=results)
     return render_template('search.html')
+
 
 def start_background_thread():
     while True:
@@ -161,12 +172,13 @@ def dashboard():
             }
             for sitemap in submitted_sitemaps
         }
-        # Fetch recent search queries
-        search_queries = SearchQuery.query.order_by(SearchQuery.timestamp.desc()).limit(10).all()
+        # Fetch top 10 most frequent search queries
+        search_queries = SearchQuery.query.order_by(SearchQuery.frequency.desc()).limit(10).all()
         return render_template("dashboard.html", sitemap_status=sitemap_status, search_queries=search_queries)
     except Exception as e:
         logging.error(f"An error occurred while loading the dashboard: {e}", exc_info=True)
         return str(e), 500
+
 
 
 @app.route("/urls", methods=["GET"])

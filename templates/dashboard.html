@@ -26,27 +26,25 @@
           <!-- Display total searches -->
           <p>Total Searches: {{ total_searches }}</p>
         </div>
-
-        <!-- Display top 10 popular search queries -->
         <div class="card top-queries-card">
-          <h2 class="card-title">Top 10 Search Queries:</h2>
+          <h2 class="card-title">Top 10 Most Searched Queries:</h2>
           <div class="two-columns">
             <table>
               <tr>
                   <th>Query</th>
+                  <th>Frequency</th>
                   <th>Timestamp</th>
               </tr>
               {% for query in search_queries %}
               <tr>
                   <td>{{ query.query }}</td>
+                  <td>{{ query.frequency }}</td>
                   <td>{{ query.timestamp }}</td>
               </tr>
               {% endfor %}
           </table>
           </div>
-          <a href="{{ url_for('all_search_queries') }}" class="btn"
-            >View All Queries</a
-          >
+          <a href="{{ url_for('all_search_queries') }}" class="btn">View All Queries</a>
         </div>
       </div>
       <div class="card">
