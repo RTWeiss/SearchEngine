@@ -12,6 +12,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import escape
 from datetime import datetime
 from models import db, IndexedURL
+from sqlalchemy import func
 
 DATABASE_URL = os.getenv('DATABASE_URL')
 
@@ -184,8 +185,8 @@ def urls():
 
 @app.route('/all_search_queries', methods=['GET'])
 def all_search_queries():
-    search_queries = SearchQuery.query.order_by(SearchQuery.id.desc()).all()
-    return render_template('all_search_queries.html', search_queries=search_queries) # Renamed 'queries' to 'search_queries'
+    search_queries = db.session.query(SearchQuery.search_term, func.sum(SearchQuery.frequency)).group_by(SearchQuery.search_term).order_by(SearchQuery.search_term).all()
+    return render_template('all_search_queries.html', search_queries=search_queries)
 
 @app.route('/delete_sitemap')
 def delete_sitemap():
