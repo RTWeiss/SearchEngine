@@ -71,7 +71,10 @@ def search():
 
 def start_background_thread():
     while True:
-        process_sitemap_queue()
+        try:
+            process_sitemap_queue()
+        except Exception as e:
+            logging.error(f"Error occurred while processing sitemap queue: {e}", exc_info=True)
         time.sleep(5)
 
 def process_sitemap_queue():
@@ -235,7 +238,9 @@ def delete_sitemap():
         flash('Sitemap URL not found')
     return redirect(url_for('dashboard'))
 
-if __name__ == '__main__':
+def run_app():
     thread = threading.Thread(target=start_background_thread)
     thread.start()
     app.run(debug=True, threaded=True)
+
+run_app()
