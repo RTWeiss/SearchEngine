@@ -155,7 +155,7 @@ def index_sitemap(sitemap_url):
                     }
 
                     if url in INDEX:
-                         if INDEX[url] != new_data:
+                        if INDEX[url] != new_data:
                             INDEX[url] = new_data
                             TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
                             SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
@@ -177,7 +177,7 @@ def index_sitemap(sitemap_url):
 
                         indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
                         db.session.add(indexed_url)
-                    
+
                     db.session.commit()
 
                 except Exception as e:
@@ -187,9 +187,7 @@ def index_sitemap(sitemap_url):
         CURRENTLY_INDEXING -= 1
         SITEMAP_STATUS[sitemap_url]['status'] = 'Indexing finished'
 
-        
         process_sitemap_queue()
-
 
 @app.route("/submit", methods=["GET", "POST"])
 def submit():
