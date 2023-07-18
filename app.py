@@ -8,6 +8,7 @@ from urllib.parse import urljoin, urlparse
 from flask import Flask, render_template, request, redirect, url_for, flash
 from bs4 import BeautifulSoup
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.dialects import postgresql
 from dotenv import load_dotenv
 from html import escape
 
@@ -19,7 +20,7 @@ app.secret_key = os.getenv('SECRET_KEY')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 
-db = SQLAlchemy(app)
+db = SQLAlchemy(app, session_options={"autoflush": False}, engine_options={"connect_args": {"check_same_thread": False}}, engine_cls=postgresql.dialect())
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
