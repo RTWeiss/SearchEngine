@@ -23,13 +23,15 @@ lock = Lock()
 INDEX = {}
 SITEMAP_STATUS = {}
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://objskwxzxzuvdd:a7c3fa0a58658cb7b21dc6dae288945d6553533a378259af35abd16d707beb09@ec2-34-226-11-94.compute-1.amazonaws.com:5432/dbsdd3r2uu4alq'
+# Using environment variable for the database URL
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
 class SearchQuery(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     query = db.Column(db.String(500))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow) # Added timestamp column
 
 class SubmittedSitemap(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -121,6 +123,12 @@ def index_url(url):
         description = description["content"] if description else "No description available"
         INDEX[url] = {"title": title, "description": description}
         logging.info(f'Successfully indexed URL: {url}')
+
+        # Update the SubmittedSitemap record
+        sitemap = SubmittedSitemap.query.filter(SubmittedSitemap.url.contains(url)).first()
+        if sitemap:
+            sitemap.indexed_urls += 1
+            db.session.commit()
     except Exception as e:
         logging.error(f"Failed to index URL: {url}", exc_info=True)
 
@@ -168,6 +176,9 @@ def all_search_queries():
 @app.route('/delete_sitemap')
 def delete_sitemap():
     sitemap_url = request.args.get('sitemap_url')
+    if sitemap_url is None: # Added check for sitemap_url
+        flash('Invalid Sitemap URL')
+        return redirect(url_for('dashboard'))
     sitemap_url = urllib.parse.unquote(sitemap_url)
     sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
     if sitemap:
