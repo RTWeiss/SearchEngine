@@ -127,6 +127,7 @@ def submit():
         new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='Added to queue', status='Not started', total_urls=0, indexed_urls=0)
         db.session.add(new_sitemap)
         db.session.commit()
+        SITEMAP_QUEUE.put(sitemap_url)  # Add the submitted sitemap to the queue
         process_sitemap_queue()
         flash("Sitemap submitted successfully.")
         return redirect(url_for('submit'))  # Redirect back to the same page
