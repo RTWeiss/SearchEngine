@@ -26,6 +26,8 @@ SITEMAP_STATUS = {}
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://objskwxzxzuvdd:a7c3fa0a58658cb7b21dc6dae288945d6553533a378259af35abd16d707beb09@ec2-34-226-11-94.compute-1.amazonaws.com:5432/dbsdd3r2uu4alq'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
+with app.app_context():
+    db.create_all()
 
 class SearchQuery(db.Model):
     id = db.Column(db.Integer, primary_key=True)
