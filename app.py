@@ -14,7 +14,7 @@ from werkzeug.utils import escape
 from urllib.parse import urljoin, urlparse
 import urllib.parse
 import random
-from models import db
+from models import db, IndexedURL
 from datetime import datetime
 
 DATABASE_URL = os.getenv('DATABASE_URL')
@@ -46,12 +46,6 @@ class SubmittedSitemap(db.Model):
     status = db.Column(db.String(100), nullable=False)
     total_urls = db.Column(db.Integer, nullable=False)
     indexed_urls = db.Column(db.Integer, nullable=True)
-
-class IndexedURL(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    url = db.Column(db.String(500), nullable=False)
-    title = db.Column(db.String(500), nullable=True)  # Added title column
-    description = db.Column(db.Text, nullable=True)  # Added description column
 
 with app.app_context():
     db.create_all()
