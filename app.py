@@ -161,10 +161,13 @@ def dashboard():
             }
             for sitemap in submitted_sitemaps
         }
-        return render_template("dashboard.html", sitemap_status=sitemap_status)
+        # Fetch recent search queries
+        search_queries = SearchQuery.query.order_by(SearchQuery.timestamp.desc()).limit(10).all()
+        return render_template("dashboard.html", sitemap_status=sitemap_status, search_queries=search_queries)
     except Exception as e:
         logging.error(f"An error occurred while loading the dashboard: {e}", exc_info=True)
         return str(e), 500
+
 
 @app.route("/urls", methods=["GET"])
 def urls():

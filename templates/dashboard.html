@@ -31,16 +31,18 @@
         <div class="card top-queries-card">
           <h2 class="card-title">Top 10 Search Queries:</h2>
           <div class="two-columns">
-            <ul class="queries-list">
-              {% for query, frequency in top_search_queries_first_half %}
-              <li>{{ query }}: {{ frequency }}</li>
+            <table>
+              <tr>
+                  <th>Query</th>
+                  <th>Timestamp</th>
+              </tr>
+              {% for query in search_queries %}
+              <tr>
+                  <td>{{ query.query }}</td>
+                  <td>{{ query.timestamp }}</td>
+              </tr>
               {% endfor %}
-            </ul>
-            <ul class="queries-list">
-              {% for query, frequency in top_search_queries_second_half %}
-              <li>{{ query }}: {{ frequency }}</li>
-              {% endfor %}
-            </ul>
+          </table>
           </div>
           <a href="{{ url_for('all_search_queries') }}" class="btn"
             >View All Queries</a
