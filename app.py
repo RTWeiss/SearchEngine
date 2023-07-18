@@ -12,6 +12,7 @@ from urllib.parse import urljoin, urlparse
 import urllib.parse
 import random
 from models import db
+from models import IndexedURL
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
