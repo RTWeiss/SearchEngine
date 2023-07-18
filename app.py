@@ -136,7 +136,16 @@ def submit():
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
     try:
-        return render_template("dashboard.html", sitemaps=SubmittedSitemap.query.all())
+        submitted_sitemaps = SubmittedSitemap.query.all()
+        sitemap_status = {
+            sitemap.url: {
+                'status': sitemap.status,
+                'total_urls': sitemap.total_urls,
+                'indexed_urls': sitemap.indexed_urls,
+            }
+            for sitemap in submitted_sitemaps
+        }
+        return render_template("dashboard.html", sitemap_status=sitemap_status)
     except Exception as e:
         logging.error(f"An error occurred while loading the dashboard: {e}", exc_info=True)
         return str(e), 500  # return the exception message for debugging
@@ -155,8 +164,10 @@ def all_search_queries():
 def delete_sitemap():
     sitemap_url = request.args.get('sitemap_url')
     sitemap_url = urllib.parse.unquote(sitemap_url)
-    if sitemap_url in SITEMAP_STATUS:
-        del SITEMAP_STATUS[sitemap_url]
+    sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
+    if sitemap:
+        db.session.delete(sitemap)
+        db.session.commit()
         flash('Sitemap has been deleted successfully')
     else:
         flash('Sitemap URL not found')
