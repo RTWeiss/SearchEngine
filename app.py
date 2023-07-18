@@ -112,7 +112,7 @@ def process_sitemap_queue():
 
 def index_sitemap(sitemap_url):
     global CURRENTLY_INDEXING, TOTAL_INDEXED_PAGES, INDEX
-    INDEX += 1
+    index = 0  # Variable to keep track of the index count
     SITEMAP_STATUS[sitemap_url] = {'status': 'Indexing started...'}
 
     try:
@@ -157,6 +157,7 @@ def index_sitemap(sitemap_url):
                     if url in INDEX:
                         if INDEX[url] != new_data:
                             INDEX[url] = new_data
+                            index += 1  # Increment the index count
                             TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
                             SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
                             print(f"Updated index for URL {url}")
@@ -171,6 +172,7 @@ def index_sitemap(sitemap_url):
                                 db.session.add(indexed_url)
                     else:
                         INDEX[url] = new_data
+                        index += 1  # Increment the index count
                         TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
                         SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
                         print(f"Added URL {url} to index")
@@ -186,6 +188,7 @@ def index_sitemap(sitemap_url):
     finally:
         CURRENTLY_INDEXING -= 1
         SITEMAP_STATUS[sitemap_url]['status'] = 'Indexing finished'
+        SITEMAP_STATUS[sitemap_url]['indexed_count'] = index  # Set the indexed count for the sitemap URL
 
         process_sitemap_queue()
 
