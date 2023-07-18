@@ -115,7 +115,7 @@ def index_sitemap(sitemap_url):
 
     try:
         response = requests.get(sitemap_url)
-        soup = BeautifulSoup(response.text, "lxml")        
+        soup = BeautifulSoup(response.text, "html.parser")  # Use html.parser as the parser library
         urls = [loc.text for loc in soup.find_all("loc")]
 
         # Add the total number of URLs to SITEMAP_STATUS
