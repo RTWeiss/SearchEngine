@@ -11,27 +11,19 @@ from werkzeug.utils import escape
 from urllib.parse import urljoin, urlparse
 import urllib.parse
 import random
-from models import db
-from models import IndexedURL
+from models import db, IndexedURL
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
-INDEX_FILE = 'index.pkl'
 SITEMAP_FILE = 'sitemaps.pkl'
 TOTAL_INDEXED_PAGES = 0  # variable to keep track of the total number of pages indexed
 TOTAL_SEARCHES = 0  # variable to keep track of the total number of searches
 SEARCH_QUERIES = {}  # dictionary to keep track of each search query along with its frequency
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://username:password@localhost/database_name'  # Update with your Heroku Postgres connection details
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgres://objskwxzxzuvdd:a7c3fa0a58658cb7b21dc6dae288945d6553533a378259af35abd16d707beb09@ec2-34-226-11-94.compute-1.amazonaws.com:5432/dbsdd3r2uu4alq'  # Update with your Heroku Postgres connection details
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-
-try:
-    with open(SITEMAP_FILE, 'rb') as f:
-        SITEMAP_STATUS = pickle.load(f)
-except (EOFError, FileNotFoundError):
-    SITEMAP_STATUS = {}
 
 SITEMAP_QUEUE = queue.Queue()
 MAX_SIMULTANEOUS_INDEXING = 5
@@ -160,15 +152,20 @@ def index_sitemap(sitemap_url):
                     }
 
                     if url in INDEX:
-                        if INDEX[url] != new_data:
+                         if INDEX[url] != new_data:
                             INDEX[url] = new_data
                             TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
                             SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
                             print(f"Updated index for URL {url}")
 
-                            indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
-                            db.session.add(indexed_url)
-                            db.session.commit()
+                            indexed_url = IndexedURL.query.filter_by(url=url).first()
+                            if indexed_url:
+                                indexed_url.title = title
+                                indexed_url.description = description
+                                indexed_url.type = url_type
+                            else:
+                                indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
+                                db.session.add(indexed_url)
                     else:
                         INDEX[url] = new_data
                         TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
@@ -177,7 +174,8 @@ def index_sitemap(sitemap_url):
 
                         indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
                         db.session.add(indexed_url)
-                        db.session.commit()
+                    
+                    db.session.commit()
 
                 except Exception as e:
                     print(f"Error occurred while indexing URL {url}: {e}")
@@ -185,13 +183,7 @@ def index_sitemap(sitemap_url):
     finally:
         CURRENTLY_INDEXING -= 1
         SITEMAP_STATUS[sitemap_url]['status'] = 'Indexing finished'
-        
-        # Save to pickle when indexing is finished
-        with open(INDEX_FILE, 'wb') as f:
-            pickle.dump(INDEX, f)
 
-        with open(SITEMAP_FILE, 'wb') as f:
-            pickle.dump(SITEMAP_STATUS, f)
         
         process_sitemap_queue()
 
