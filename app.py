@@ -77,7 +77,7 @@ def index_sitemap(sitemap_url):
 
 def get_urls_from_sitemap(sitemap_url):
     response = requests.get(sitemap_url)
-    soup = BeautifulSoup(response.text, "html.parser")
+    soup = BeautifulSoup(response.text, "xml")
     urls = [loc.text for loc in soup.find_all("loc")]
     return urls
 
