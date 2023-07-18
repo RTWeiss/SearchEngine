@@ -54,6 +54,7 @@ class IndexedURL(db.Model):
     description = db.Column(db.Text, nullable=True)  # Added description column
 
 with app.app_context():
+    db.create_all()
 
 SITEMAP_QUEUE = queue.Queue()
 MAX_SIMULTANEOUS_INDEXING = 5
