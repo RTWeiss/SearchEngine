@@ -1,21 +1,17 @@
 import os
 import logging
-import pickle
 import time
 from flask import Flask, render_template, request, redirect, url_for, flash
 from bs4 import BeautifulSoup
 import requests
 import threading
+import urllib.parse
 from threading import Lock
 import queue
-import re
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import escape
-from urllib.parse import urljoin, urlparse
-import urllib.parse
-import random
-from models import db, IndexedURL
 from datetime import datetime
+from models import db, IndexedURL
 
 DATABASE_URL = os.getenv('DATABASE_URL')
 
@@ -26,10 +22,7 @@ app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
 lock = Lock()
-INDEX = {}
-SITEMAP_STATUS = {}
 
-# Using environment variable for the database URL
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
@@ -37,7 +30,7 @@ db.init_app(app)
 class SearchQuery(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     query = db.Column(db.String(500))
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow) # Added timestamp column
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 class SubmittedSitemap(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -54,7 +47,6 @@ SITEMAP_QUEUE = queue.Queue()
 MAX_SIMULTANEOUS_INDEXING = 5
 CURRENTLY_INDEXING = 0
 
-# Set up logging
 logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
 @app.route('/', methods=['GET', 'POST'])
@@ -65,7 +57,6 @@ def search():
         db.session.add(new_query)
         db.session.commit()
 
-        # For every url in the database, check if the query is in the title, description, or url
         results = IndexedURL.query.filter(
             IndexedURL.url.contains(query) |
             IndexedURL.title.contains(query) |
@@ -77,7 +68,7 @@ def search():
 def start_background_thread():
     while True:
         process_sitemap_queue()
-        time.sleep(5)  # Sleep for 5 seconds between checks
+        time.sleep(5)
 
 def process_sitemap_queue():
     global CURRENTLY_INDEXING
@@ -85,18 +76,15 @@ def process_sitemap_queue():
         with lock:
             if CURRENTLY_INDEXING < MAX_SIMULTANEOUS_INDEXING:
                 sitemap_url = SITEMAP_QUEUE.get()
-                SITEMAP_STATUS[sitemap_url] = 'Waiting to start indexing...'
                 indexing_thread = threading.Thread(target=index_sitemap, args=(sitemap_url,))
                 indexing_thread.start()
                 CURRENTLY_INDEXING += 1
                 logging.info(f'Started indexing thread for: {sitemap_url}')
 
 def index_sitemap(sitemap_url):
-    global CURRENTLY_INDEXING, INDEX
+    global CURRENTLY_INDEXING
 
-    SITEMAP_STATUS[sitemap_url] = {'status': 'Indexing started...'}
     urls = get_urls_from_sitemap(sitemap_url)
-    SITEMAP_STATUS[sitemap_url]['total_urls'] = len(urls)
     logging.info(f'Found {len(urls)} URLs in sitemap: {sitemap_url}')
 
     sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
@@ -105,17 +93,12 @@ def index_sitemap(sitemap_url):
         db.session.commit()
 
     for url in urls:
-        if sitemap_url not in SITEMAP_STATUS:
-            logging.info(f"Stopped indexing for deleted sitemap: {sitemap_url}")
-            return
-        else:
-            try:
-                index_url(url, sitemap)  # Pass the sitemap to the index_url function
-            except Exception as e:
-                logging.error(f"Error occurred while indexing URL {url}: {e}", exc_info=True)
+        try:
+            index_url(url, sitemap)
+        except Exception as e:
+            logging.error(f"Error occurred while indexing URL {url}: {e}", exc_info=True)
 
     CURRENTLY_INDEXING -= 1
-    SITEMAP_STATUS[sitemap_url]['status'] = 'Indexing finished'
 
     process_sitemap_queue()
 
@@ -125,7 +108,6 @@ def get_urls_from_sitemap(sitemap_url):
     urls = [loc.text for loc in soup.find_all("loc")]
     return urls
 
-
 def index_url(url, sitemap):
     try:
         res = requests.get(url)
@@ -134,12 +116,10 @@ def index_url(url, sitemap):
         description = page_soup.find("meta", attrs={"name": "description"})
         description = description["content"] if description else "No description available"
 
-        # Save the indexed data to the database
         new_indexed_url = IndexedURL(url=url, title=title, description=description)
         db.session.add(new_indexed_url)
         db.session.commit()
 
-        # Update the SubmittedSitemap table to reflect the indexing
         if sitemap:
             sitemap.indexed_urls = sitemap.indexed_urls + 1 if sitemap.indexed_urls else 1
             db.session.commit()
@@ -153,11 +133,11 @@ def submit():
         new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='Added to queue', status='Not started', total_urls=0, indexed_urls=0)
         db.session.add(new_sitemap)
         db.session.commit()
-        SITEMAP_QUEUE.put(sitemap_url)  # Add the submitted sitemap to the queue
+        SITEMAP_QUEUE.put(sitemap_url)
         flash("Sitemap submitted successfully.")
-        return redirect(url_for('submit'))  # Redirect back to the same page
+        return redirect(url_for('submit'))
     else:
-        return render_template("submit.html")  # Render the submit page if the request method is GET
+        return render_template("submit.html")
 
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
@@ -174,22 +154,21 @@ def dashboard():
         return render_template("dashboard.html", sitemap_status=sitemap_status)
     except Exception as e:
         logging.error(f"An error occurred while loading the dashboard: {e}", exc_info=True)
-        return str(e), 500  # return the exception message for debugging
+        return str(e), 500
 
 @app.route("/urls", methods=["GET"])
 def urls():
-    return render_template("urls.html", index=INDEX)
+    return render_template("urls.html")
 
 @app.route('/all_search_queries', methods=['GET'])
 def all_search_queries():
-    # Retrieving all search queries from the database
     queries = SearchQuery.query.order_by(SearchQuery.id.desc()).all()
     return render_template('all_search_queries.html', queries=queries)
 
 @app.route('/delete_sitemap')
 def delete_sitemap():
     sitemap_url = request.args.get('sitemap_url')
-    if sitemap_url is None: # Added check for sitemap_url
+    if sitemap_url is None:
         flash('Invalid Sitemap URL')
         return redirect(url_for('dashboard'))
     sitemap_url = urllib.parse.unquote(sitemap_url)
@@ -206,4 +185,3 @@ if __name__ == '__main__':
     thread = threading.Thread(target=start_background_thread)
     thread.start()
     app.run(debug=True, threaded=True)
-
