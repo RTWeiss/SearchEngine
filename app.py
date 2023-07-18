@@ -201,7 +201,6 @@ def submit():
     else:
         return render_template("submit.html")  # Render the submit page if the request method is GET
 
-
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
     top_search_queries = dict(sorted(SEARCH_QUERIES.items(), key=lambda item: item[1], reverse=True)[:10])
