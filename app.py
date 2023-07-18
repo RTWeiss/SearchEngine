@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, cur
 from bs4 import BeautifulSoup
 import requests
 import threading
+from threading import Lock
 import queue
 import re
 from flask_sqlalchemy import SQLAlchemy
@@ -17,6 +18,7 @@ import psycopg2
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
+lock = Lock()
 INDEX = {}
 SITEMAP_STATUS = {}
 TOTAL_INDEXED_PAGES = 0  # variable to keep track of the total number of pages indexed
@@ -105,12 +107,14 @@ def search():
 
 def process_sitemap_queue():
     global CURRENTLY_INDEXING
-    while not SITEMAP_QUEUE.empty() and CURRENTLY_INDEXING < MAX_SIMULTANEOUS_INDEXING:
-        sitemap_url = SITEMAP_QUEUE.get()
-        SITEMAP_STATUS[sitemap_url] = 'Waiting to start indexing...'
-        indexing_thread = threading.Thread(target=index_sitemap, args=(sitemap_url,))
-        indexing_thread.start()
-        CURRENTLY_INDEXING += 1
+    while not SITEMAP_QUEUE.empty():
+        with lock:
+            if CURRENTLY_INDEXING < MAX_SIMULTANEOUS_INDEXING:
+                sitemap_url = SITEMAP_QUEUE.get()
+                SITEMAP_STATUS[sitemap_url] = 'Waiting to start indexing...'
+                indexing_thread = threading.Thread(target=index_sitemap, args=(sitemap_url,))
+                indexing_thread.start()
+                CURRENTLY_INDEXING += 1
 
 def index_sitemap(sitemap_url):
     global CURRENTLY_INDEXING, TOTAL_INDEXED_PAGES, INDEX
@@ -158,26 +162,16 @@ def index_sitemap(sitemap_url):
                         }
 
                         with db.session.begin():  # Remove subtransactions=True
-                            if url in INDEX:
-                                if INDEX[url] != new_data:
+                            with lock:
+                                if url in INDEX:
+                                    if INDEX[url] != new_data:
+                                        INDEX[url] = new_data
+                                        TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
+                                        SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
+                                else:
                                     INDEX[url] = new_data
                                     TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
                                     SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
-                                    print(f"Updated index for URL {url}")
-
-                                    indexed_url = IndexedURL.query.filter_by(url=url).first()
-                                    if indexed_url:
-                                        indexed_url.title = title
-                                        indexed_url.description = description
-                                        indexed_url.type = url_type
-                                    else:
-                                        indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
-                                        db.session.add(indexed_url)
-                            else:
-                                INDEX[url] = new_data
-                                TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
-                                SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
-                                print(f"Added URL {url} to index")
 
                                 indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
                                 db.session.add(indexed_url)
@@ -246,7 +240,6 @@ def all_search_queries():
     # Get all search queries, not just top 10
     all_search_queries = dict(sorted(SEARCH_QUERIES.items(), key=lambda item: item[1], reverse=True))
     return render_template('all_search_queries.html', all_search_queries=all_search_queries)
-
 
 if __name__ == '__main__':
     with app.app_context():
