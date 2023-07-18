@@ -66,11 +66,11 @@ def search():
         db.session.commit()
 
         # For every url in the database, check if the query is in the title, description, or url
-        results = {
-            url.url: {**pickle.loads(url.indexed_data), 'title': escape(pickle.loads(url.indexed_data)['title']), 'description': escape(pickle.loads(url.indexed_data)['description'])}
-            for url in IndexedURL.query.all()
-            if query in pickle.loads(url.indexed_data)['title'].lower() or query in url.url.lower() or query in pickle.loads(url.indexed_data)['description'].lower()
-        }
+        results = IndexedURL.query.filter(
+            IndexedURL.url.contains(query) |
+            IndexedURL.title.contains(query) |
+            IndexedURL.description.contains(query)
+        ).all()
         return render_template('results.html', query=query, results=results)
     return render_template('search.html')
 
@@ -109,17 +109,10 @@ def index_sitemap(sitemap_url):
             except Exception as e:
                 logging.error(f"Error occurred while indexing URL {url}: {e}", exc_info=True)
 
-            # Update the SubmittedSitemap record
-            sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
-            if sitemap:
-                sitemap.indexed_urls += 1
-                db.session.commit()
-
     CURRENTLY_INDEXING -= 1
     SITEMAP_STATUS[sitemap_url]['status'] = 'Indexing finished'
 
     process_sitemap_queue()
-
 
 def get_urls_from_sitemap(sitemap_url):
     response = requests.get(sitemap_url)
@@ -134,19 +127,11 @@ def index_url(url):
         title = page_soup.find("title").text if page_soup.find("title") else url
         description = page_soup.find("meta", attrs={"name": "description"})
         description = description["content"] if description else "No description available"
-        INDEX[url] = {"title": title, "description": description}
-        logging.info(f'Successfully indexed URL: {url}')
 
         # Save the indexed data to the database
         new_indexed_url = IndexedURL(url=url, title=title, description=description)
         db.session.add(new_indexed_url)
         db.session.commit()
-
-        # Update the SubmittedSitemap record
-        sitemap = SubmittedSitemap.query.filter(SubmittedSitemap.url.contains(url)).first()
-        if sitemap:
-            sitemap.indexed_urls += 1
-            db.session.commit()
     except Exception as e:
         logging.error(f"Failed to index URL: {url}", exc_info=True)
 
