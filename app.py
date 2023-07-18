@@ -6,11 +6,12 @@ import requests
 import threading
 import queue
 import re
-from flask import Markup
+from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import escape
 from urllib.parse import urljoin, urlparse
 import urllib.parse
 import random
+from models import db
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -21,12 +22,9 @@ TOTAL_INDEXED_PAGES = 0  # variable to keep track of the total number of pages i
 TOTAL_SEARCHES = 0  # variable to keep track of the total number of searches
 SEARCH_QUERIES = {}  # dictionary to keep track of each search query along with its frequency
 
-
-try:
-    with open(INDEX_FILE, 'rb') as f:
-        INDEX = pickle.load(f)
-except (EOFError, FileNotFoundError):
-    INDEX = {}
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://username:password@localhost/database_name'  # Update with your Heroku Postgres connection details
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
 try:
     with open(SITEMAP_FILE, 'rb') as f:
@@ -38,9 +36,35 @@ SITEMAP_QUEUE = queue.Queue()
 MAX_SIMULTANEOUS_INDEXING = 5
 CURRENTLY_INDEXING = 0
 
+def calculate_relevance_score(query, data):
+    # Implement your own function to calculate the relevance score based on the search query and data for a URL
+    # You can consider factors like the presence and frequency of query terms in the title, description, and content of the page
+    # Assign a numerical score representing the relevance of the page to the search query
+    # Higher scores indicate higher relevance
+
+    title = data['title'].lower()
+    description = data['description'].lower()
+
+    # Example: Relevance scoring based on the presence of query terms in the title and description
+    score = 0
+    title_matches = title.count(query)
+    description_matches = description.count(query)
+
+    # Increase the score for multiple instances of the search query in the title or description
+    score += title_matches
+    score += description_matches
+
+    # Add additional points for an exact match of the search query
+    if query in title:
+        score += 5
+    if query in description:
+        score += 3
+
+    return score
+
 @app.route('/', methods=['GET', 'POST'])
 def search():
-    global TOTAL_SEARCHES, SEARCH_QUERIES
+    global TOTAL_SEARCHES, SEARCH_QUERIES, INDEX
 
     query = None  # Initialize query variable here
     results = {}
@@ -80,45 +104,6 @@ def search():
         return render_template('results.html', query=query, results=results, ad=ad)
     return render_template('search.html')
 
-def calculate_relevance_score(query, data):
-    # Implement your own function to calculate the relevance score based on the search query and data for a URL
-    # You can consider factors like the presence and frequency of query terms in the title, description, and content of the page
-    # Assign a numerical score representing the relevance of the page to the search query
-    # Higher scores indicate higher relevance
-
-    title = data['title'].lower()
-    description = data['description'].lower()
-
-    # Example: Relevance scoring based on the presence of query terms in the title and description
-    score = 0
-    title_matches = title.count(query)
-    description_matches = description.count(query)
-
-    # Increase the score for multiple instances of the search query in the title or description
-    score += title_matches
-    score += description_matches
-
-    # Add additional points for an exact match of the search query
-    if query in title:
-        score += 5
-    if query in description:
-        score += 3
-
-    return score
-
-
-@app.route("/submit", methods=["GET", "POST"])
-def submit():
-    if request.method == "POST":
-        sitemap_url = request.form["sitemap_url"]
-        SITEMAP_QUEUE.put(sitemap_url)
-        SITEMAP_STATUS[sitemap_url] = 'Added to queue'
-        process_sitemap_queue()
-        flash("Sitemap submitted successfully.")
-        return redirect(url_for('submit'))  # Redirect back to the same page
-    else:
-        return render_template("submit.html")  # Render the submit page if the request method is GET
-
 
 def process_sitemap_queue():
     global CURRENTLY_INDEXING
@@ -131,7 +116,7 @@ def process_sitemap_queue():
 
 
 def index_sitemap(sitemap_url):
-    global CURRENTLY_INDEXING, TOTAL_INDEXED_PAGES
+    global CURRENTLY_INDEXING, TOTAL_INDEXED_PAGES, INDEX
     SITEMAP_STATUS[sitemap_url] = {'status': 'Indexing started...'}
 
     try:
@@ -179,11 +164,19 @@ def index_sitemap(sitemap_url):
                             TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
                             SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
                             print(f"Updated index for URL {url}")
+
+                            indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
+                            db.session.add(indexed_url)
+                            db.session.commit()
                     else:
                         INDEX[url] = new_data
                         TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
                         SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
                         print(f"Added URL {url} to index")
+
+                        indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
+                        db.session.add(indexed_url)
+                        db.session.commit()
 
                 except Exception as e:
                     print(f"Error occurred while indexing URL {url}: {e}")
@@ -202,6 +195,19 @@ def index_sitemap(sitemap_url):
         process_sitemap_queue()
 
 
+@app.route("/submit", methods=["GET", "POST"])
+def submit():
+    if request.method == "POST":
+        sitemap_url = request.form["sitemap_url"]
+        SITEMAP_QUEUE.put(sitemap_url)
+        SITEMAP_STATUS[sitemap_url] = 'Added to queue'
+        process_sitemap_queue()
+        flash("Sitemap submitted successfully.")
+        return redirect(url_for('submit'))  # Redirect back to the same page
+    else:
+        return render_template("submit.html")  # Render the submit page if the request method is GET
+
+
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
     top_search_queries = dict(sorted(SEARCH_QUERIES.items(), key=lambda item: item[1], reverse=True)[:10])
@@ -214,23 +220,27 @@ def dashboard():
                            top_search_queries_first_half=top_search_queries_first_half, 
                            top_search_queries_second_half=top_search_queries_second_half)
 
+
 @app.route("/urls", methods=["GET"])
 def urls():
-    return render_template("urls.html", index=INDEX)
+    index = IndexedURL.query.all()
+    return render_template("urls.html", index=index)
+
 
 @app.route('/delete_sitemap')
 def delete_sitemap():
-    global INDEX
     sitemap_url = request.args.get('sitemap_url')
     sitemap_url = urllib.parse.unquote(sitemap_url)
-    if sitemap_url in SITEMAP_STATUS:
+    sitemap_entry = SITEMAP_STATUS.get(sitemap_url)
+    if sitemap_entry:
+        db.session.query(IndexedURL).filter(IndexedURL.url.startswith(sitemap_url)).delete(synchronize_session=False)
+        db.session.commit()
         del SITEMAP_STATUS[sitemap_url]
-        # also remove the corresponding entries from INDEX if necessary
-        INDEX = {k: v for k, v in INDEX.items() if not k.startswith(sitemap_url)}
         flash('Sitemap and corresponding URLs have been deleted successfully')
     else:
         flash('Sitemap URL not found')
     return redirect(url_for('dashboard'))
+
 
 @app.route('/all_search_queries')
 def all_search_queries():
@@ -240,4 +250,6 @@ def all_search_queries():
 
 
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)
