@@ -17,69 +17,74 @@
     <link
       rel="stylesheet"
       type="text/css"
-      href="{{ url_for('static', filename='style.css') }}"
+      href="{{ url_for('static', filename='results.css') }}"
     />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap"
-      rel="stylesheet"
-    />
-
     <meta name="viewport" content="width=device-width, initial-scale=1" />
   </head>
   <body>
-    <header></header>
     <div class="container">
-      <form action="/" method="post">
-        <input
-          type="text"
-          name="query"
-          placeholder="Search the web"
-          value="{{ query }}"
-        />
-        <input type="submit" value="Search" />
-      </form>
-    </div>
-    <div class="container">
-      <h2>Images</h2>
-      <div class="carousel">
-        {% for url, data in results.items() %} {% if data['type'] == 'image' %}
-        <div class="slide">
-          <a href="{{ url }}">
-            <img
-              class="carousel-image"
-              src="{{ url }}"
-              alt="{{ data['title'] }}"
-            />
-          </a>
+      <div class="main-content">
+        &nbsp;
+        <form action="/" method="post">
+          <input
+            type="text"
+            name="query"
+            placeholder="Search the web"
+            value="{{ query }}"
+          />
+          <input type="submit" value="Search" />
+        </form>
+        <h2>Images</h2>
+        <div class="carousel">
+          {% for url, data in results.items() %} {% if data['type'] == 'image'
+          %}
+          <div class="slide">
+            <a href="{{ url }}">
+              <img
+                class="carousel-image"
+                src="{{ url }}"
+                alt="{{ data['title'] }}"
+              />
+            </a>
+          </div>
+          {% endif %} {% endfor %}
         </div>
+        <h2>Webpages</h2>
+        <ul class="search-results">
+          {% for url, data in results.items() %} {% if data['type'] == 'webpage'
+          %}
+          <li>
+            <a class="title-link" href="{{ url }}">{{ data['title']}}</a>
+            <div class="url">{{ url}}</div>
+            <p>{{ data['description']}}</p>
+          </li>
+          {% endif %} {% endfor %}
+        </ul>
+        {% for url, data in results.items() %} {% if url.endswith('.pdf') %}
+        <h2>Files</h2>
+        <ul class="search-results">
+          <li>
+            <a class="title-link" href="{{ url}}">{{ data['title'] }}</a>
+            <div class="url">{{ url}}</div>
+            <p>{{ data['description']}}</p>
+          </li>
+        </ul>
         {% endif %} {% endfor %}
       </div>
+      <aside class="sidebar">
+        {% if ad %}
+        <div class="ad-banner">
+          <h2>Promoted</h2>
+          <!-- Ad code goes here -->
+          <a href="{{ ad['url'] }}">
+            <h4>{{ ad['title'] }}</h4>
+            <div>{{ ad['url'] }}</div>
+            <p>{{ ad['description'] }}</p>
+          </a>
+        </div>
+        {% endif %}
+      </aside>
     </div>
-    <div class="container">
-      <h2>Webpages</h2>
-      <ul class="search-results">
-        {% for url, data in results.items() %} {% if data['type'] == 'webpage'
-        %}
-        <li>
-          <a class="title-link" href="{{ url }}">{{ data['title']}}</a>
-          <div class="url">{{ url}}</div>
-          <p>{{ data['description']}}</p>
-        </li>
-        {% endif %} {% endfor %}
-      </ul>
-
-      {% for url, data in results.items() %} {% if url.endswith('.pdf') %}
-      <h2>Files</h2>
-      <ul class="search-results">
-        <li>
-          <a class="title-link" href="{{ url}}">{{ data['title'] }}</a>
-          <div class="url">{{ url}}</div>
-          <p>{{ data['description']}}</p>
-        </li>
-      </ul>
-      {% endif %} {% endfor %}
-    </div>
-
     <footer>
       <a href="/">Home</a>
       <a href="/submit">Submit a Sitemap</a>

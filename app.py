@@ -10,6 +10,7 @@ from flask import Markup
 from werkzeug.utils import escape
 from urllib.parse import urljoin, urlparse
 import urllib.parse
+import random
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -37,10 +38,13 @@ SITEMAP_QUEUE = queue.Queue()
 MAX_SIMULTANEOUS_INDEXING = 5
 CURRENTLY_INDEXING = 0
 
-
 @app.route('/', methods=['GET', 'POST'])
 def search():
     global TOTAL_SEARCHES, SEARCH_QUERIES
+
+    query = None  # Initialize query variable here
+    results = {}
+    ad = {}  # Initialize ad variable here
 
     if request.method == 'POST':
         query = request.form.get('query').lower()
@@ -61,9 +65,20 @@ def search():
         # Sort the results based on relevance score
         results = dict(sorted(results.items(), key=lambda x: x[1]['relevance_score'], reverse=True))
 
-        return render_template('results.html', query=query, results=results)
-    return render_template('search.html')
+        # Pick a random URL for the ad
+        ad_url = None
+        while ad_url is None or results[ad_url]['type'] == 'image':
+            ad_url = random.choice(list(results.keys()))
 
+        ad = {
+            'title': results[ad_url]['title'],
+            'url': ad_url,
+            'description': results[ad_url]['description']
+        }
+
+    if request.method == 'POST':
+        return render_template('results.html', query=query, results=results, ad=ad)
+    return render_template('search.html')
 
 def calculate_relevance_score(query, data):
     # Implement your own function to calculate the relevance score based on the search query and data for a URL

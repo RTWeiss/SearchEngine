@@ -1,0 +1,90 @@
+/* search.css */
+/* Define colors */
+:root {
+  --primary-color: #0a75c2;
+  --secondary-color: #222831;
+  --text-color: #393e46;
+  --background-color: #eeeeee;
+  --card-background-color: #ffffff;
+  --btn-color: #4ecca3;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f4f4f4;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.container {
+  width: 90%;
+  margin: 0 auto;
+  text-align: center;
+}
+
+form {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.search-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+input[type="text"] {
+  padding: 10px;
+  margin-right: 10px;
+  border: 1px solid #dfe1e5;
+  border-radius: 24px;
+  width: 80%; /* Makes the search bar wider */
+  font-size: 18px;
+}
+
+input[type="submit"] {
+  padding: 10px 20px;
+  background-color: #4ecca3;
+  color: #ffffff;
+  border: 1px solid #dfe1e5;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+input[type="submit"]:hover {
+  padding: 10px 20px;
+  background-color: #0a75c2;
+  color: #ffffff;
+  border: 1px solid #dfe1e5;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+footer {
+  background-color: #f2f2f2;
+  padding: 20px;
+  text-align: center;
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  border-top: 1px solid #e0e0e5;
+}
+
+footer a {
+  color: #000;
+  text-decoration: none;
+  margin: 0 15px;
+}
+
+footer a:hover {
+  text-decoration: underline;
+}
