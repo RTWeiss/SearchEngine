@@ -14,6 +14,7 @@ from urllib.parse import urljoin, urlparse
 import urllib.parse
 import random
 from models import db, IndexedURL
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -26,6 +27,11 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://objskwxzxzuvdd:a7c3fa0a586
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
+class SearchQuery(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    query = db.Column(db.String(100), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
 SITEMAP_QUEUE = queue.Queue()
 MAX_SIMULTANEOUS_INDEXING = 5
 CURRENTLY_INDEXING = 0
@@ -37,6 +43,9 @@ logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(level
 def search():
     if request.method == 'POST':
         query = request.form.get('query').lower()
+        new_query = SearchQuery(query=query)
+        db.session.add(new_query)
+        db.session.commit()
 
         results = {
             url: {**data, 'title': escape(data['title']), 'description': escape(data['description'])}
@@ -45,6 +54,7 @@ def search():
         }
         return render_template('results.html', query=query, results=results)
     return render_template('search.html')
+
 
 def process_sitemap_queue():
     global CURRENTLY_INDEXING
@@ -122,11 +132,7 @@ def urls():
 @app.route('/all_search_queries', methods=['GET'])
 def all_search_queries():
     # Retrieving all search queries from the database
-    # queries = ... (your code to get the data)
-
-    # For the sake of example, let's create a mock list of queries
-    queries = ['query 1', 'query 2', 'query 3']
-
+    queries = SearchQuery.query.order_by(SearchQuery.timestamp.desc()).all()
     return render_template('all_search_queries.html', queries=queries)
 
 @app.route('/delete_sitemap')
