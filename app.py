@@ -13,6 +13,7 @@ import urllib.parse
 import random
 from models import db, IndexedURL
 import psycopg2
+from flask import current_app
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -115,82 +116,83 @@ def index_sitemap(sitemap_url):
     index = 0  # Variable to keep track of the index count
     SITEMAP_STATUS[sitemap_url] = {'status': 'Indexing started...'}
 
-    try:
-        response = requests.get(sitemap_url)
-        soup = BeautifulSoup(response.text, "html.parser")  # Use html.parser as the parser library
-        urls = [loc.text for loc in soup.find_all("loc")]
+    with current_app.app_context():  # Set up the application context
+        try:
+            response = requests.get(sitemap_url)
+            soup = BeautifulSoup(response.text, "html.parser")  # Use html.parser as the parser library
+            urls = [loc.text for loc in soup.find_all("loc")]
 
-        # Add the total number of URLs to SITEMAP_STATUS
-        SITEMAP_STATUS[sitemap_url]['total_urls'] = len(urls)
-        SITEMAP_STATUS[sitemap_url]['indexed_urls'] = 0
+            # Add the total number of URLs to SITEMAP_STATUS
+            SITEMAP_STATUS[sitemap_url]['total_urls'] = len(urls)
+            SITEMAP_STATUS[sitemap_url]['indexed_urls'] = 0
 
-        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.bmp', '.webp']
+            image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.bmp', '.webp']
 
-        for url in urls:
-            if sitemap_url not in SITEMAP_STATUS:
-                print(f"Stopped indexing for deleted sitemap: {sitemap_url}")
-                return
-            
-            if url.endswith('.xml'):
-                SITEMAP_QUEUE.put(url)
-                SITEMAP_STATUS[url] = 'Added to queue'
-                process_sitemap_queue()
-            else:
-                try:
-                    res = requests.get(url)
-                    page_soup = BeautifulSoup(res.text, "html.parser")
-                    title = page_soup.find("title").text if page_soup.find("title") else url
-                    description = page_soup.find("meta", attrs={"name": "description"})
-                    description = description["content"] if description else "No description available"
+            for url in urls:
+                if sitemap_url not in SITEMAP_STATUS:
+                    print(f"Stopped indexing for deleted sitemap: {sitemap_url}")
+                    return
+                
+                if url.endswith('.xml'):
+                    SITEMAP_QUEUE.put(url)
+                    SITEMAP_STATUS[url] = 'Added to queue'
+                    process_sitemap_queue()
+                else:
+                    try:
+                        res = requests.get(url)
+                        page_soup = BeautifulSoup(res.text, "html.parser")
+                        title = page_soup.find("title").text if page_soup.find("title") else url
+                        description = page_soup.find("meta", attrs={"name": "description"})
+                        description = description["content"] if description else "No description available"
 
-                    url_type = "webpage"
+                        url_type = "webpage"
 
-                    if any(re.search(ext, url) for ext in image_extensions):
-                        url_type = "image"
+                        if any(re.search(ext, url) for ext in image_extensions):
+                            url_type = "image"
 
-                    new_data = {
-                        "title": title,
-                        "description": description,
-                        "type": url_type
-                    }
+                        new_data = {
+                            "title": title,
+                            "description": description,
+                            "type": url_type
+                        }
 
-                    if url in INDEX:
-                        if INDEX[url] != new_data:
+                        if url in INDEX:
+                            if INDEX[url] != new_data:
+                                INDEX[url] = new_data
+                                index += 1  # Increment the index count
+                                TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
+                                SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
+                                print(f"Updated index for URL {url}")
+
+                                indexed_url = IndexedURL.query.filter_by(url=url).first()
+                                if indexed_url:
+                                    indexed_url.title = title
+                                    indexed_url.description = description
+                                    indexed_url.type = url_type
+                                else:
+                                    indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
+                                    db.session.add(indexed_url)
+                        else:
                             INDEX[url] = new_data
                             index += 1  # Increment the index count
                             TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
                             SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
-                            print(f"Updated index for URL {url}")
+                            print(f"Added URL {url} to index")
 
-                            indexed_url = IndexedURL.query.filter_by(url=url).first()
-                            if indexed_url:
-                                indexed_url.title = title
-                                indexed_url.description = description
-                                indexed_url.type = url_type
-                            else:
-                                indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
-                                db.session.add(indexed_url)
-                    else:
-                        INDEX[url] = new_data
-                        index += 1  # Increment the index count
-                        TOTAL_INDEXED_PAGES += 1  # increment total number of pages indexed
-                        SITEMAP_STATUS[sitemap_url]['indexed_urls'] += 1
-                        print(f"Added URL {url} to index")
+                            indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
+                            db.session.add(indexed_url)
 
-                        indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
-                        db.session.add(indexed_url)
+                        db.session.commit()
 
-                    db.session.commit()
+                    except Exception as e:
+                        print(f"Error occurred while indexing URL {url}: {e}")
 
-                except Exception as e:
-                    print(f"Error occurred while indexing URL {url}: {e}")
+        finally:
+                CURRENTLY_INDEXING -= 1
+                SITEMAP_STATUS[sitemap_url]['status'] = 'Indexing finished'
+                SITEMAP_STATUS[sitemap_url]['indexed_count'] = index  # Set the indexed count for the sitemap URL
 
-    finally:
-        CURRENTLY_INDEXING -= 1
-        SITEMAP_STATUS[sitemap_url]['status'] = 'Indexing finished'
-        SITEMAP_STATUS[sitemap_url]['indexed_count'] = index  # Set the indexed count for the sitemap URL
-
-        process_sitemap_queue()
+                process_sitemap_queue()
 
 @app.route("/submit", methods=["GET", "POST"])
 def submit():
