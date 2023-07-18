@@ -90,6 +90,7 @@ def index_sitemap(sitemap_url):
     sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
     if sitemap:
         sitemap.total_urls = len(urls)
+        sitemap.indexing_status = 'Indexing'  # update status to indexing
         db.session.commit()
 
     for url in urls:
@@ -100,7 +101,13 @@ def index_sitemap(sitemap_url):
 
     CURRENTLY_INDEXING -= 1
 
+    # After finishing indexing update status of sitemap
+    if sitemap:
+        sitemap.indexing_status = 'Completed'  # update status to completed
+        db.session.commit()
+
     process_sitemap_queue()
+
 
 def get_urls_from_sitemap(sitemap_url):
     response = requests.get(sitemap_url)
