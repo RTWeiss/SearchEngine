@@ -180,11 +180,11 @@ def index_sitemap(sitemap_url):
                                 indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
                                 db.session.add(indexed_url)
                 
-                db.session.commit()
-                index += 1  # Increment the index count for each URL processed
+                        db.session.commit()
+                        index += 1  # Increment the index count for each URL processed
 
-        except Exception as e:
-            print(f"Error occurred while indexing URL {url}: {e}")
+                    except Exception as e:
+                        print(f"Error occurred while indexing URL {url}: {e}")
 
         finally:
             CURRENTLY_INDEXING -= 1
