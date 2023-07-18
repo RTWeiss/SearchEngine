@@ -184,8 +184,8 @@ def urls():
 
 @app.route('/all_search_queries', methods=['GET'])
 def all_search_queries():
-    queries = SearchQuery.query.order_by(SearchQuery.id.desc()).all()
-    return render_template('all_search_queries.html', queries=queries)
+    search_queries = SearchQuery.query.order_by(SearchQuery.id.desc()).all()
+    return render_template('all_search_queries.html', search_queries=search_queries) # Renamed 'queries' to 'search_queries'
 
 @app.route('/delete_sitemap')
 def delete_sitemap():

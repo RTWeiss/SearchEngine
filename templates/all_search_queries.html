@@ -20,8 +20,8 @@
 
       <div class="card">
         <ul>
-          {% for query, frequency in all_search_queries.items() %}
-          <li>{{ query }}: {{ frequency }}</li>
+          {% for query in search_queries %}
+          <li>{{ query.search_term }}: {{ query.frequency }}</li>
           {% endfor %}
         </ul>
       </div>
