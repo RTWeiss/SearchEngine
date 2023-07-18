@@ -29,9 +29,9 @@ db.init_app(app)
 
 class SearchQuery(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    query = db.Column(db.String(500))
+    search_term = db.Column(db.String(500))  # Change this line
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    frequency = db.Column(db.Integer, default=1)  # Add this line
+    frequency = db.Column(db.Integer, default=1)
 
 
 class SubmittedSitemap(db.Model):
@@ -54,18 +54,19 @@ logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(level
 @app.route('/', methods=['GET', 'POST'])
 def search():
     if request.method == 'POST':
-        query = request.form.get('query').lower()
-        new_query = SearchQuery(query=query)
+        search_term = request.form.get('query').lower()  
+        new_query = SearchQuery(search_term=search_term)  
         db.session.add(new_query)
         db.session.commit()
 
         results = IndexedURL.query.filter(
-            IndexedURL.url.contains(query) |
-            IndexedURL.title.contains(query) |
-            IndexedURL.description.contains(query)
+            IndexedURL.url.contains(search_term) |  # Change query to search_term
+            IndexedURL.title.contains(search_term) |  # Change query to search_term
+            IndexedURL.description.contains(search_term)  # Change query to search_term
         ).all()
-        return render_template('results.html', query=query, results=results)
+        return render_template('results.html', query=search_term, results=results)  # Change query to search_term
     return render_template('search.html')
+
 
 def start_background_thread():
     while True:
