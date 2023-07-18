@@ -66,6 +66,11 @@ def search():
         return render_template('results.html', query=query, results=results)
     return render_template('search.html')
 
+def start_background_thread():
+    while True:
+        process_sitemap_queue()
+        time.sleep(5)  # Sleep for 5 seconds between checks
+
 def process_sitemap_queue():
     global CURRENTLY_INDEXING
     while not SITEMAP_QUEUE.empty():
@@ -128,7 +133,6 @@ def submit():
         db.session.add(new_sitemap)
         db.session.commit()
         SITEMAP_QUEUE.put(sitemap_url)  # Add the submitted sitemap to the queue
-        process_sitemap_queue()
         flash("Sitemap submitted successfully.")
         return redirect(url_for('submit'))  # Redirect back to the same page
     else:
@@ -175,4 +179,7 @@ def delete_sitemap():
     return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
+    thread = threading.Thread(target=start_background_thread)
+    thread.start()
     app.run(debug=True, threaded=True)
+
