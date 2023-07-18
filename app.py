@@ -1,53 +1,70 @@
 import os
-import pickle
 from flask import Flask, render_template, request, redirect, url_for, flash
 from bs4 import BeautifulSoup
 import requests
 import threading
-import queue
 import re
 from flask import Markup
-from werkzeug.utils import escape
 from urllib.parse import urljoin, urlparse
 import urllib.parse
 import random
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
-INDEX_FILE = 'index.pkl'
-SITEMAP_FILE = 'sitemaps.pkl'
-TOTAL_INDEXED_PAGES = 0  # variable to keep track of the total number of pages indexed
-TOTAL_SEARCHES = 0  # variable to keep track of the total number of searches
-SEARCH_QUERIES = {}  # dictionary to keep track of each search query along with its frequency
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')  # Postgres DB URL should be provided by Heroku in this environment variable
+
+db = SQLAlchemy(app)
 
 
-try:
-    with open(INDEX_FILE, 'rb') as f:
-        INDEX = pickle.load(f)
-except (EOFError, FileNotFoundError):
-    INDEX = {}
+class SearchQuery(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    query = db.Column(db.String(256), unique=False, nullable=False)
+    count = db.Column(db.Integer, unique=False, nullable=False)
 
-try:
-    with open(SITEMAP_FILE, 'rb') as f:
-        SITEMAP_STATUS = pickle.load(f)
-except (EOFError, FileNotFoundError):
-    SITEMAP_STATUS = {}
+
+class SiteMap(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    sitemap_url = db.Column(db.String(2048), unique=True, nullable=False)
+    status = db.Column(db.String(256), unique=False, nullable=False)
+    total_urls = db.Column(db.Integer, unique=False, nullable=True)
+    indexed_urls = db.Column(db.Integer, unique=False, nullable=True)
+
+
+class IndexedURL(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.String(2048), unique=True, nullable=False)
+    title = db.Column(db.String(256), unique=False, nullable=False)
+    description = db.Column(db.String(2048), unique=False, nullable=False)
+    type = db.Column(db.String(64), unique=False, nullable=False)
+
+
+db.create_all()
+db.session.commit()
 
 SITEMAP_QUEUE = queue.Queue()
 MAX_SIMULTANEOUS_INDEXING = 5
 CURRENTLY_INDEXING = 0
 
+
 @app.route('/', methods=['GET', 'POST'])
 def search():
-    global TOTAL_SEARCHES, SEARCH_QUERIES
-
-    query = None  # Initialize query variable here
     results = {}
     ad = {}  # Initialize ad variable here
 
     if request.method == 'POST':
         query = request.form.get('query').lower()
+
+        # Update the search query count in the database
+        search_query = SearchQuery.query.filter_by(query=query).first()
+        if search_query is None:
+            search_query = SearchQuery(query=query, count=1)
+        else:
+            search_query.count += 1
+        db.session.add(search_query)
+        db.session.commit()
         TOTAL_SEARCHES += 1  # increment total number of searches
         SEARCH_QUERIES[query] = SEARCH_QUERIES.get(query, 0) + 1  # increment search query frequency
 
