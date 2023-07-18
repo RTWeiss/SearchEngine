@@ -17,7 +17,7 @@ import psycopg2
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
-INDEX = 0
+INDEX = {}
 SITEMAP_STATUS = {}
 TOTAL_INDEXED_PAGES = 0  # variable to keep track of the total number of pages indexed
 TOTAL_SEARCHES = 0  # variable to keep track of the total number of searches
