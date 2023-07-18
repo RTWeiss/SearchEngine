@@ -48,6 +48,9 @@ class SubmittedSitemap(db.Model):
     indexed_urls = db.Column(db.Integer, nullable=True)
 
 class IndexedURL(db.Model):
+    __tablename__ = 'indexed_url'
+    __table_args__ = {'extend_existing': True}
+
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.String(500), nullable=False)
     title = db.Column(db.String(500), nullable=True)  # Added title column
@@ -148,7 +151,7 @@ def index_url(url):
             db.session.commit()
     except Exception as e:
         logging.error(f"Failed to index URL: {url}", exc_info=True)
-        
+
 @app.route("/submit", methods=["GET", "POST"])
 def submit():
     if request.method == "POST":
