@@ -1,4 +1,5 @@
 import os
+import logging
 import pickle
 from flask import Flask, render_template, request, redirect, url_for, flash
 from bs4 import BeautifulSoup
@@ -29,6 +30,9 @@ SITEMAP_QUEUE = queue.Queue()
 MAX_SIMULTANEOUS_INDEXING = 5
 CURRENTLY_INDEXING = 0
 
+# Set up logging
+logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
+
 @app.route('/', methods=['GET', 'POST'])
 def search():
     if request.method == 'POST':
@@ -52,6 +56,7 @@ def process_sitemap_queue():
                 indexing_thread = threading.Thread(target=index_sitemap, args=(sitemap_url,))
                 indexing_thread.start()
                 CURRENTLY_INDEXING += 1
+                logging.info(f'Started indexing thread for: {sitemap_url}')
 
 def index_sitemap(sitemap_url):
     global CURRENTLY_INDEXING, INDEX
@@ -59,16 +64,17 @@ def index_sitemap(sitemap_url):
     SITEMAP_STATUS[sitemap_url] = {'status': 'Indexing started...'}
     urls = get_urls_from_sitemap(sitemap_url)
     SITEMAP_STATUS[sitemap_url]['total_urls'] = len(urls)
+    logging.info(f'Found {len(urls)} URLs in sitemap: {sitemap_url}')
 
     for url in urls:
         if sitemap_url not in SITEMAP_STATUS:
-            print(f"Stopped indexing for deleted sitemap: {sitemap_url}")
+            logging.info(f"Stopped indexing for deleted sitemap: {sitemap_url}")
             return
         else:
             try:
                 index_url(url)
             except Exception as e:
-                print(f"Error occurred while indexing URL {url}: {e}")
+                logging.error(f"Error occurred while indexing URL {url}: {e}", exc_info=True)
 
     CURRENTLY_INDEXING -= 1
     SITEMAP_STATUS[sitemap_url]['status'] = 'Indexing finished'
@@ -82,12 +88,16 @@ def get_urls_from_sitemap(sitemap_url):
     return urls
 
 def index_url(url):
-    res = requests.get(url)
-    page_soup = BeautifulSoup(res.text, "html.parser")
-    title = page_soup.find("title").text if page_soup.find("title") else url
-    description = page_soup.find("meta", attrs={"name": "description"})
-    description = description["content"] if description else "No description available"
-    INDEX[url] = {"title": title, "description": description}
+    try:
+        res = requests.get(url)
+        page_soup = BeautifulSoup(res.text, "html.parser")
+        title = page_soup.find("title").text if page_soup.find("title") else url
+        description = page_soup.find("meta", attrs={"name": "description"})
+        description = description["content"] if description else "No description available"
+        INDEX[url] = {"title": title, "description": description}
+        logging.info(f'Successfully indexed URL: {url}')
+    except Exception as e:
+        logging.error(f"Failed to index URL: {url}", exc_info=True)
 
 @app.route("/submit", methods=["GET", "POST"])
 def submit():
@@ -113,7 +123,7 @@ def urls():
 def all_search_queries():
     # Retrieving all search queries from the database
     # queries = ... (your code to get the data)
-    
+
     # For the sake of example, let's create a mock list of queries
     queries = ['query 1', 'query 2', 'query 3']
 
@@ -131,4 +141,4 @@ def delete_sitemap():
     return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, threaded=True)
