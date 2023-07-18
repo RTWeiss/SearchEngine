@@ -55,17 +55,9 @@ logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(level
 def search():
     if request.method == 'POST':
         query = request.form.get('query').lower()
-        # Check if the query exists already
-        existing_query = SearchQuery.query.filter_by(query=query).first()
-        if existing_query:
-            # If it exists, increment the frequency
-            existing_query.frequency += 1
-            db.session.commit()
-        else:
-            # If it doesn't exist, create a new one
-            new_query = SearchQuery(query=query)
-            db.session.add(new_query)
-            db.session.commit()
+        new_query = SearchQuery(query=query)
+        db.session.add(new_query)
+        db.session.commit()
 
         results = IndexedURL.query.filter(
             IndexedURL.url.contains(query) |
@@ -74,7 +66,6 @@ def search():
         ).all()
         return render_template('results.html', query=query, results=results)
     return render_template('search.html')
-
 
 def start_background_thread():
     while True:
@@ -172,13 +163,12 @@ def dashboard():
             }
             for sitemap in submitted_sitemaps
         }
-        # Fetch top 10 most frequent search queries
-        search_queries = SearchQuery.query.order_by(SearchQuery.frequency.desc()).limit(10).all()
+        # Fetch recent search queries
+        search_queries = SearchQuery.query.order_by(SearchQuery.timestamp.desc()).limit(10).all()
         return render_template("dashboard.html", sitemap_status=sitemap_status, search_queries=search_queries)
     except Exception as e:
         logging.error(f"An error occurred while loading the dashboard: {e}", exc_info=True)
         return str(e), 500
-
 
 
 @app.route("/urls", methods=["GET"])
