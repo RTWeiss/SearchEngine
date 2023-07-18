@@ -50,7 +50,8 @@ class SubmittedSitemap(db.Model):
 class IndexedURL(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.String(500), nullable=False)
-    indexed_data = db.Column(db.PickleType, nullable=False)
+    title = db.Column(db.String(500), nullable=True)  # Added title column
+    description = db.Column(db.Text, nullable=True)  # Added description column
 
 with app.app_context():
     db.create_all()
@@ -136,8 +137,7 @@ def index_url(url):
         logging.info(f'Successfully indexed URL: {url}')
 
         # Save the indexed data to the database
-        indexed_data = pickle.dumps({"title": title, "description": description})
-        new_indexed_url = IndexedURL(url=url, indexed_data=indexed_data)
+        new_indexed_url = IndexedURL(url=url, title=title, description=description)
         db.session.add(new_indexed_url)
         db.session.commit()
 
@@ -148,7 +148,7 @@ def index_url(url):
             db.session.commit()
     except Exception as e:
         logging.error(f"Failed to index URL: {url}", exc_info=True)
-
+        
 @app.route("/submit", methods=["GET", "POST"])
 def submit():
     if request.method == "POST":
