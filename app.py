@@ -103,8 +103,8 @@ def submit():
         sitemap_url = request.form["sitemap_url"]
         new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='In queue', status='Not started', total_urls=0)
         try:
-            db.session.add(new_sitemap)
-            db.session.commit()
+            with db.session.begin():
+                db.session.add(new_sitemap)
             increment_currently_indexing()  # increment the indexing count
             index_sitemap(sitemap_url)  # call index_sitemap function here
             SITEMAP_QUEUE.put(sitemap_url)
