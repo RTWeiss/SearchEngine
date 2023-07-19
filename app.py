@@ -242,5 +242,6 @@ def run_app():
     thread = threading.Thread(target=start_background_thread)
     thread.start()
     app.run(debug=True, threaded=True)
-
-run_app()
+    
+if __name__ == "__main__":
+    run_app()
