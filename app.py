@@ -259,30 +259,35 @@ def delete_sitemap():
     return redirect(url_for('dashboard'))
 
 def process_sitemap_queue():
-    while True:
-        if not SITEMAP_QUEUE.empty():
-            sitemap_url = SITEMAP_QUEUE.get()
-            sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
-            if sitemap:
-                sitemap.indexing_status = 'Indexing'
+    while not SITEMAP_QUEUE.empty():
+        sitemap_url = SITEMAP_QUEUE.get()
+        sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
+        if sitemap:
+            sitemap.indexing_status = 'Indexing'
+            db.session.commit()
+            try:
+                future = executor.submit(index_sitemap, sitemap_url, sitemap.id)
+                future.add_done_callback(lambda x: update_sitemap_status(x, sitemap))
+            except Exception as e:
+                logging.error(f"Error occurred while indexing sitemap: {e}", exc_info=True)
+                sitemap.indexing_status = 'Failed'
                 db.session.commit()
-                try:
-                    index_sitemap(sitemap_url, sitemap.id)
-                except Exception as e:
-                    logging.error(f"Error occurred while indexing sitemap: {e}", exc_info=True)
-                    sitemap.indexing_status = 'Failed'
-                    db.session.commit()
-        time.sleep(5)
+
+def update_sitemap_status(future, sitemap):
+    exception = future.exception()
+    if exception:
+        sitemap.indexing_status = 'Failed'
+        logging.error(f"Error occurred while indexing sitemap: {exception}", exc_info=True)
+    else:
+        sitemap.indexing_status = 'Completed'
+    db.session.commit()
 
 def start_background_thread():
-    while True:
-        try:
-            with app.app_context():  # Create new application context
-                if not SITEMAP_QUEUE.empty():
-                    process_sitemap_queue()
-        except Exception as e:
-            logging.error(f"Error occurred while processing sitemap queue: {e}", exc_info=True)
-        time.sleep(5)
+    thread = threading.Thread(target=process_sitemap_queue, daemon=True)
+    thread.start()
+    time.sleep(1)
+    if not thread.is_alive():
+        logging.error("Background thread failed to start.")
 
 def run_app():
     thread = threading.Thread(target=start_background_thread, daemon=True)  # target=start_background_thread
