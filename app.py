@@ -151,15 +151,12 @@ def index_sitemap(sitemap_url, sitemap_id):
         sitemap = SubmittedSitemap.query.get(sitemap_id)
         if sitemap:
             sitemap.indexing_status = 'Indexing'
-            try:
-                sitemap.total_urls = len(urls)  # Update total_urls
-                db.session.commit()
-            except Exception as e:
-                logging.error(f"An error occurred while saving total_urls: {str(e)}", exc_info=True)
+            sitemap.total_urls = len(urls)  # Saving total number of urls to database
+            db.session.commit()
         for url in urls:
-            index_url(url, sitemap.id)  # Pass sitemap_id here
+            index_url(url, sitemap.id)
         if sitemap:
-            sitemap.indexing_status = 'Completed'  # Update status after indexing is done
+            sitemap.indexing_status = 'Completed'
             db.session.commit()
     except Exception as e:
         logging.error(f"An error occurred while indexing sitemap: {sitemap_url}. Error: {str(e)}", exc_info=True)
@@ -168,11 +165,10 @@ def index_sitemap(sitemap_url, sitemap_id):
             sitemap.indexing_status = 'Failed'
             db.session.commit()
 
-
-def index_url(url, sitemap_id):  # sitemap argument is sitemap_id here
+def index_url(url, sitemap_id):
     try:
         response = requests.get(url, timeout=10)
-        response.raise_for_status()  # Will raise an HTTPError if the response was unsuccessful
+        response.raise_for_status()
     except requests.exceptions.RequestException as e:
         logging.error(f"Failed to fetch {url}: {e}", exc_info=True)
         return
@@ -184,10 +180,10 @@ def index_url(url, sitemap_id):  # sitemap argument is sitemap_id here
     description_tag = soup.find("meta", attrs={"name": "description"})
     description = description_tag.get("content") if description_tag else "N/A"
 
-    indexed_url = IndexedURL(url=url, title=title, description=description, type=None, sitemap_id=sitemap_id)  # Added type=None here
+    indexed_url = IndexedURL(url=url, title=title, description=description, type=None, sitemap_id=sitemap_id)  
 
     db.session.add(indexed_url)
-    db.session.commit()  # Commit the changes here
+    db.session.commit()  # Indexing url to database
     print(f"Indexed {url}")
 
 def get_urls_from_sitemap(sitemap_url):
