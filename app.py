@@ -259,19 +259,23 @@ def delete_sitemap():
     return redirect(url_for('dashboard'))
 
 def process_sitemap_queue():
-    while not SITEMAP_QUEUE.empty():
-        sitemap_url = SITEMAP_QUEUE.get()
-        sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
-        if sitemap:
-            sitemap.indexing_status = 'Indexing'
-            db.session.commit()
-            try:
-                future = executor.submit(index_sitemap, sitemap_url, sitemap.id)
-                future.add_done_callback(lambda x: update_sitemap_status(x, sitemap))
-            except Exception as e:
-                logging.error(f"Error occurred while indexing sitemap: {e}", exc_info=True)
-                sitemap.indexing_status = 'Failed'
+    with app.app_context():
+        while True:
+            semaphore.acquire()  # add semaphore here to limit the number of concurrent threads
+            sitemap_url = SITEMAP_QUEUE.get()  # blocking get
+            sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
+            if sitemap:
+                sitemap.indexing_status = 'Indexing'
                 db.session.commit()
+                try:
+                    future = executor.submit(index_sitemap, sitemap_url, sitemap.id)
+                    future.add_done_callback(lambda x: update_sitemap_status(x, sitemap))
+                    SITEMAP_QUEUE.task_done()  # mark task as done
+                except Exception as e:
+                    logging.error(f"Error occurred while indexing sitemap: {e}", exc_info=True)
+                    sitemap.indexing_status = 'Failed'
+                    db.session.commit()
+            semaphore.release()  # release semaphore when finished with task
 
 def update_sitemap_status(future, sitemap):
     exception = future.exception()
@@ -285,9 +289,6 @@ def update_sitemap_status(future, sitemap):
 def start_background_thread():
     thread = threading.Thread(target=process_sitemap_queue, daemon=True)
     thread.start()
-    time.sleep(1)
-    if not thread.is_alive():
-        logging.error("Background thread failed to start.")
 
 def run_app():
     thread = threading.Thread(target=start_background_thread, daemon=True)  # target=start_background_thread
