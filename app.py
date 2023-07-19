@@ -78,7 +78,7 @@ def search():
 def start_background_thread():
     while True:
         try:
-            if not SITEMAP_QUEUE.empty():
+            while not SITEMAP_QUEUE.empty():
                 process_sitemap_queue()
         except Exception as e:
             logging.error(f"Error occurred while processing sitemap queue: {e}", exc_info=True)
@@ -110,10 +110,17 @@ def process_sitemap_queue():
         if sitemap:
             sitemap.indexing_status = 'Indexing'
             db.session.commit()
-        index_sitemap(sitemap_url)
-        if sitemap:
-            sitemap.indexing_status = 'Completed'
-            db.session.commit()
+        try:
+            index_sitemap(sitemap_url)
+            if sitemap:
+                sitemap.indexing_status = 'Completed'
+                db.session.commit()
+        except Exception as e:
+            logging.error(f"Error occurred while indexing sitemap: {e}", exc_info=True)
+            if sitemap:
+                sitemap.indexing_status = 'Failed'
+                db.session.commit()
+
 
 def index_sitemap(sitemap_url):
     response = requests.get(sitemap_url)
