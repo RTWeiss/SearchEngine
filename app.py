@@ -1,5 +1,6 @@
 import os
 import logging
+import threading
 import time
 from flask import Flask, render_template, request, redirect, url_for, flash
 from bs4 import BeautifulSoup
@@ -163,6 +164,26 @@ def start_background_thread():
             logging.error(f"Error occurred while processing sitemap queue: {e}", exc_info=True)
         time.sleep(5)
 
+def index_sitemap(sitemap_url, sitemap_id):
+    try:
+        urls = get_urls_from_sitemap(sitemap_url)
+        for url in urls:
+            try:
+                index_url(url, sitemap_id)  # Replaced scrape_and_index_url with index_url
+            except Exception as e:
+                logging.error(f"An error occurred while indexing URL: {url}. Error: {str(e)}", exc_info=True)
+                
+        sitemap = SubmittedSitemap.query.get(sitemap_id)
+        if sitemap:
+            sitemap.indexing_status = 'Completed'
+            db.session.commit()
+    except Exception as e:
+        logging.error(f"An error occurred while indexing sitemap: {sitemap_url}. Error: {str(e)}", exc_info=True)
+        sitemap = SubmittedSitemap.query.get(sitemap_id)
+        if sitemap:
+            sitemap.indexing_status = 'Failed'
+            db.session.commit()
+
 def process_sitemap_queue():
     while not SITEMAP_QUEUE.empty():
         semaphore.acquire()  # Control the number of simultaneous indexings
@@ -183,47 +204,6 @@ def process_sitemap_queue():
                 db.session.commit()
         finally:
             semaphore.release()  # Release the semaphore after indexing is completed
-
-def index_sitemap(sitemap_url, sitemap_id):
-    try:
-        urls = get_urls_from_sitemap(sitemap_url)
-        for url in urls:
-            try:
-                scrape_and_index_url(url, sitemap_id)
-            except Exception as e:
-                logging.error(f"An error occurred while indexing URL: {url}. Error: {str(e)}", exc_info=True)
-                
-        sitemap = SubmittedSitemap.query.get(sitemap_id)
-        if sitemap:
-            sitemap.indexing_status = 'Completed'
-            db.session.commit()
-    except Exception as e:
-        logging.error(f"An error occurred while indexing sitemap: {sitemap_url}. Error: {str(e)}", exc_info=True)
-        sitemap = SubmittedSitemap.query.get(sitemap_id)
-        if sitemap:
-            sitemap.indexing_status = 'Failed'
-            db.session.commit()
-
-def scrape_and_index_url(url, sitemap_id):
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Failed to fetch {url}: {e}", exc_info=True)
-        return
-
-    soup = BeautifulSoup(response.text, "html.parser")
-    title = soup.find("title")
-    title = title.text if title else "N/A"
-
-    description_tag = soup.find("meta", attrs={"name": "description"})
-    description = description_tag.get("content") if description_tag else "N/A"
-
-    indexed_url = IndexedURL(url=url, title=title, description=description, type=None, sitemap_id=sitemap_id)  
-
-    db.session.add(indexed_url)
-    db.session.commit()  # Indexing url to database
-    print(f"Indexed {url}")
 
 
 def index_url(url, sitemap_id):
