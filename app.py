@@ -188,7 +188,7 @@ def dashboard():
         submitted_sitemaps = SubmittedSitemap.query.all()
         sitemap_status = {
             sitemap.url: {
-                'status': sitemap.status,
+                'indexing_status': sitemap.indexing_status,
                 'total_urls': sitemap.total_urls,
                 'indexed_urls': sitemap.indexed_urls,
             }
@@ -206,7 +206,7 @@ def dashboard():
         total_pages = sum([sitemap.total_urls for sitemap in submitted_sitemaps])
         total_searches = SearchQuery.query.count()
 
-        return render_template('dashboard.html', submitted_sitemaps=submitted_sitemaps)
+        return render_template('dashboard.html', total_pages=total_pages, search_queries=search_queries, sitemap_status=sitemap_status)
     except Exception as e:
         logging.error(f"An error occurred while loading the dashboard: {e}", exc_info=True)
         return str(e), 500
