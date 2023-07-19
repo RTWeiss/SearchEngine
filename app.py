@@ -152,10 +152,11 @@ def index_sitemap(sitemap_url):
     if sitemap:
         update_sitemap(sitemap, 'Indexing', total_urls=len(urls))  # Update total_urls
     for url in urls:
-        index_url(url, sitemap)
+        index_url(url, sitemap)  # Pass sitemap object here
     if sitemap:
         sitemap.total_urls = len(urls)  # Update total_urls after indexing is done
         db.session.commit()
+
 
 def index_url(url, sitemap):  # sitemap argument added here
     try:
