@@ -102,6 +102,7 @@ def decrement_currently_indexing():
 def update_sitemap(sitemap, status, total_urls=None, indexed_urls=None):
     with lock:
         sitemap.indexing_status = status
+        sitemap.status = status  # Update status field as well
         if total_urls is not None:
             sitemap.total_urls = total_urls
         db.session.commit()
@@ -198,6 +199,9 @@ def index_sitemap(sitemap_url):
         update_sitemap(sitemap, 'Indexing', total_urls=len(urls))  # Update total_urls
     for url in urls:
         index_url(url, sitemap)
+    if sitemap:
+        sitemap.total_urls = len(urls)  # Update total_urls after indexing is done
+        db.session.commit()
 
 def index_url(url, sitemap):  # sitemap argument added here
     try:
