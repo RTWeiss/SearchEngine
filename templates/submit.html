@@ -9,7 +9,7 @@
   <body>
     <div class="container">
     <center><h1>Submit a Sitemap</h1></center>
-    <form method="POST">
+    <form method="POST" action="{{ url_for('submit') }}">
       <input type="text" name="sitemap_url" required placeholder="Enter sitemap URL">
       <input type="submit" value="Submit">
     </form>
