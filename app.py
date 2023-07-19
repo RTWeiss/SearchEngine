@@ -257,7 +257,7 @@ def dashboard():
             sitemap.url: {
                 'indexing_status': sitemap.indexing_status,
                 'total_urls': sitemap.total_urls,
-                'indexed_urls': IndexedURL.query.filter_by(sitemap_id=sitemap.id).count(),  # Use SQLAlchemy query to count indexed urls
+                'indexed_urls': len(sitemap.indexed_urls),  # Count indexed urls related to each sitemap
             }
             for sitemap in submitted_sitemaps
         }
