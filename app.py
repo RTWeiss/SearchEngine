@@ -194,7 +194,7 @@ def index_sitemap(sitemap_url, sitemap_id):
         urls = get_urls_from_sitemap(sitemap_url)
         for url in urls:
             try:
-                index_url(url, sitemap.id)
+                scrape_and_index_url(url, sitemap_id)
             except Exception as e:
                 logging.error(f"An error occurred while indexing URL: {url}. Error: {str(e)}", exc_info=True)
                 
@@ -208,6 +208,28 @@ def index_sitemap(sitemap_url, sitemap_id):
         if sitemap:
             sitemap.indexing_status = 'Failed'
             db.session.commit()
+
+def scrape_and_index_url(url, sitemap_id):
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Failed to fetch {url}: {e}", exc_info=True)
+        return
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    title = soup.find("title")
+    title = title.text if title else "N/A"
+
+    description_tag = soup.find("meta", attrs={"name": "description"})
+    description = description_tag.get("content") if description_tag else "N/A"
+
+    indexed_url = IndexedURL(url=url, title=title, description=description, type=None, sitemap_id=sitemap_id)  
+
+    db.session.add(indexed_url)
+    db.session.commit()  # Indexing url to database
+    print(f"Indexed {url}")
+
 
 def index_url(url, sitemap_id):
     try:
