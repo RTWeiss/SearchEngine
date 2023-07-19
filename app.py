@@ -76,14 +76,17 @@ def start_background_thread():
         except Exception as e:
             logging.error(f"Error occurred while processing sitemap queue: {e}", exc_info=True)
 
-def process_sitemap_queue(sitemap_url):
+def process_sitemap_queue():
     global CURRENTLY_INDEXING
-    with lock:
-        if CURRENTLY_INDEXING < MAX_SIMULTANEOUS_INDEXING:
-            indexing_thread = threading.Thread(target=index_sitemap, args=(sitemap_url,))
-            indexing_thread.start()
-            CURRENTLY_INDEXING += 1
-            logging.info(f'Started indexing thread for: {sitemap_url}')
+    while not SITEMAP_QUEUE.empty():
+        with lock:
+            if CURRENTLY_INDEXING < MAX_SIMULTANEOUS_INDEXING:
+                sitemap_url = SITEMAP_QUEUE.get()
+                logging.info(f'Starting a new indexing thread for: {sitemap_url}')  # added logging
+                indexing_thread = threading.Thread(target=index_sitemap, args=(sitemap_url,))
+                indexing_thread.start()
+                CURRENTLY_INDEXING += 1
+                logging.info(f'Started indexing thread for: {sitemap_url}')
 
 def index_sitemap(sitemap_url):
     global CURRENTLY_INDEXING
