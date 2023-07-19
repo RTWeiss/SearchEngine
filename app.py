@@ -14,9 +14,12 @@ from datetime import datetime
 from sqlalchemy import func
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import copy_current_request_context
+from sqlalchemy.orm import sessionmaker
+
 
 MAX_SIMULTANEOUS_INDEXING = 5
 DATABASE_URL = os.getenv('DATABASE_URL')
+
 
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -28,6 +31,7 @@ lock = Lock()
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+Session = sessionmaker(bind=db.engine)
 executor = ThreadPoolExecutor(max_workers=MAX_SIMULTANEOUS_INDEXING)
 semaphore = Semaphore(MAX_SIMULTANEOUS_INDEXING)
 SITEMAP_QUEUE = queue.Queue()
@@ -129,23 +133,37 @@ def index_url(url, sitemap_id):
 
     indexed_url = IndexedURL(url=url, title=title, description=description, type=None, sitemap_id=sitemap_id)
 
-    logging.info(f"Indexing URL: {url}")
-    db.session.add(indexed_url)
-    db.session.commit()
-    print(f"Indexed {url}")
+    session = Session()  # create a new session for this thread
+    try:
+        logging.info(f"Indexing URL: {url}")
+        session.add(indexed_url)
+        session.commit()
+        print(f"Indexed {url}")
+    except Exception as e:
+        session.rollback()
+        logging.error(f"Error occurred while indexing URL: {e}", exc_info=True)
+    finally:
+        session.close()
 
 def update_sitemap(sitemap, status, total_urls=None, indexed_urls=None):
+    session = Session()  # create a new session for this thread
     with lock:
-        sitemap.indexing_status = status
-        sitemap.status = status  # Update status field as well
-        if total_urls is not None:
-            sitemap.total_urls = total_urls
-        db.session.commit()
-        if indexed_urls is not None:
-            for url in indexed_urls:
-                new_url = IndexedURL(url=url, sitemap_id=sitemap.id)  # Adjust this line according to your IndexedURL model
-                db.session.add(new_url)
-            db.session.commit()
+        try:
+            sitemap.indexing_status = status
+            sitemap.status = status  # Update status field as well
+            if total_urls is not None:
+                sitemap.total_urls = total_urls
+            session.commit()
+            if indexed_urls is not None:
+                for url in indexed_urls:
+                    new_url = IndexedURL(url=url, sitemap_id=sitemap.id)  # Adjust this line according to your IndexedURL model
+                    session.add(new_url)
+                session.commit()
+        except Exception as e:
+            session.rollback()
+            logging.error(f"Error occurred while updating sitemap: {e}", exc_info=True)
+        finally:
+            session.close()
 
 @app.route('/', methods=['GET', 'POST'])
 def search():
