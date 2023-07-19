@@ -177,26 +177,25 @@ def index_sitemap(sitemap_url, sitemap_id):
             db.session.commit()
 
 def process_sitemap_queue():
-    while not SITEMAP_QUEUE.empty():
+    while True:  # Change this to while True, it will be always checking the DB for sitemaps in queue.
         semaphore.acquire()  # Control the number of simultaneous indexings
-        sitemap_url = SITEMAP_QUEUE.get()
-        sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
-        if sitemap:
-            sitemap.indexing_status = 'Indexing'
-            db.session.commit()
+        sitemap = SubmittedSitemap.query.filter_by(indexing_status='In queue').first()  # Fetch next sitemap in queue from the database
+        if not sitemap:  # If no sitemap found, release semaphore, sleep and continue the loop
+            semaphore.release()
+            time.sleep(1)
+            continue
+        sitemap.indexing_status = 'Indexing'
+        db.session.commit()
         try:
-            index_sitemap(sitemap_url, sitemap.id)  # Pass sitemap.id as well
-            if sitemap:
-                sitemap.indexing_status = 'Completed'
-                db.session.commit()
+            index_sitemap(sitemap.url, sitemap.id)  # Pass sitemap.id as well
+            sitemap.indexing_status = 'Completed'
+            db.session.commit()
         except Exception as e:
             logging.error(f"Error occurred while indexing sitemap: {e}", exc_info=True)
-            if sitemap:
-                sitemap.indexing_status = 'Failed'
-                db.session.commit()
+            sitemap.indexing_status = 'Failed'
+            db.session.commit()
         finally:
             semaphore.release()  # Release the semaphore after indexing is completed
-
 
 def index_url(url, sitemap_id):
     try:
@@ -299,13 +298,12 @@ def start_background_thread():
         time.sleep(5)
 
 def run_app():
-    thread = threading.Thread(target=start_background_thread, daemon=True)
+    thread = threading.Thread(target=process_sitemap_queue, daemon=True)  # Changed the target function
     thread.start()
     time.sleep(1)
     if not thread.is_alive():
         logging.error("Background thread failed to start.")
     app.run(debug=True, threaded=True)
-
 
 if __name__ == "__main__":
     run_app()
