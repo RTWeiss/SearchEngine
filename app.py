@@ -31,7 +31,6 @@ db = SQLAlchemy(app)
 executor = ThreadPoolExecutor(max_workers=MAX_SIMULTANEOUS_INDEXING)
 semaphore = Semaphore(MAX_SIMULTANEOUS_INDEXING)
 SITEMAP_QUEUE = queue.Queue()
-CURRENTLY_INDEXING = 0
 
 logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
@@ -88,61 +87,15 @@ def search():
         return render_template('results.html', query=search_term, results=results)  # Change query to search_term
     return render_template('search.html')
 
-
-def increment_currently_indexing():
-    global CURRENTLY_INDEXING
-    with lock:
-        CURRENTLY_INDEXING += 1
-
 def decrement_currently_indexing():
     global CURRENTLY_INDEXING
     with lock:
         CURRENTLY_INDEXING -= 1
 
-def update_sitemap(sitemap, status, total_urls=None, indexed_urls=None):
+def increment_currently_indexing():
+    global CURRENTLY_INDEXING
     with lock:
-        sitemap.indexing_status = status
-        sitemap.status = status  # Update status field as well
-        if total_urls is not None:
-            sitemap.total_urls = total_urls
-        db.session.commit()
-        if indexed_urls is not None:
-            for url in indexed_urls:
-                new_url = IndexedURL(url=url, sitemap_id=sitemap.id)  # Adjust this line according to your IndexedURL model
-                db.session.add(new_url)
-            db.session.commit()
-
-def get_urls_from_sitemap(sitemap_url):
-    response = requests.get(sitemap_url)
-    soup = BeautifulSoup(response.text, "xml")
-    urls = []
-
-    # Handle normal sitemap with <url> tags
-    url_tags = soup.find_all("url")
-    urls.extend([url.loc.string for url in url_tags])
-
-    # Handle sitemap index files with <sitemap> tags
-    sitemap_tags = soup.find_all("sitemap")
-    for sitemap in sitemap_tags:
-        sitemap_response = requests.get(sitemap.loc.string)
-        sitemap_soup = BeautifulSoup(sitemap_response.text, "xml")
-        url_tags = sitemap_soup.find_all("url")
-        urls.extend([url.loc.string for url in url_tags])
-
-    # Handle case where sitemap contains links to other .xml files
-    # Assuming these links are in <loc> tags
-    xml_loc_tags = soup.find_all("loc")
-    for xml_url in xml_loc_tags:
-        # Checking if the url is of an xml file
-        if xml_url.text.endswith('.xml'):
-            # Make a request to the xml file
-            xml_response = requests.get(xml_url.text)
-            xml_soup = BeautifulSoup(xml_response.text, "xml")
-            # Extract all urls from the xml file
-            xml_url_tags = xml_soup.find_all("loc")
-            urls.extend([url.string for url in xml_url_tags])
-
-    return urls
+        CURRENTLY_INDEXING += 1
 
 @app.route("/submit", methods=["GET", "POST"])
 def submit():
@@ -153,6 +106,7 @@ def submit():
             db.session.add(new_sitemap)
             db.session.commit()
             increment_currently_indexing()  # increment the indexing count
+            index_sitemap(sitemap_url)  # call index_sitemap function here
             SITEMAP_QUEUE.put(sitemap_url)
             return redirect(url_for('submit'))
         except Exception as e:
@@ -225,6 +179,51 @@ def index_url(url, sitemap):  # sitemap argument added here
     db.session.commit()
     print(f"Indexed {url}")
 
+def get_urls_from_sitemap(sitemap_url):
+    response = requests.get(sitemap_url)
+    soup = BeautifulSoup(response.text, "xml")
+    urls = []
+
+    # Handle normal sitemap with <url> tags
+    url_tags = soup.find_all("url")
+    urls.extend([url.loc.string for url in url_tags])
+
+    # Handle sitemap index files with <sitemap> tags
+    sitemap_tags = soup.find_all("sitemap")
+    for sitemap in sitemap_tags:
+        sitemap_response = requests.get(sitemap.loc.string)
+        sitemap_soup = BeautifulSoup(sitemap_response.text, "xml")
+        url_tags = sitemap_soup.find_all("url")
+        urls.extend([url.loc.string for url in url_tags])
+
+    # Handle case where sitemap contains links to other .xml files
+    # Assuming these links are in <loc> tags
+    xml_loc_tags = soup.find_all("loc")
+    for xml_url in xml_loc_tags:
+        # Checking if the url is of an xml file
+        if xml_url.text.endswith('.xml'):
+            # Make a request to the xml file
+            xml_response = requests.get(xml_url.text)
+            xml_soup = BeautifulSoup(xml_response.text, "xml")
+            # Extract all urls from the xml file
+            xml_url_tags = xml_soup.find_all("loc")
+            urls.extend([url.string for url in xml_url_tags])
+
+    return urls
+
+def update_sitemap(sitemap, status, total_urls=None, indexed_urls=None):
+    with lock:
+        sitemap.indexing_status = status
+        sitemap.status = status  # Update status field as well
+        if total_urls is not None:
+            sitemap.total_urls = total_urls
+        db.session.commit()
+        if indexed_urls is not None:
+            for url in indexed_urls:
+                new_url = IndexedURL(url=url, sitemap_id=sitemap.id)  # Adjust this line according to your IndexedURL model
+                db.session.add(new_url)
+            db.session.commit()
+
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
     try:
@@ -283,11 +282,10 @@ def delete_sitemap():
 def run_app():
     thread = threading.Thread(target=start_background_thread, daemon=True)
     thread.start()
-    time.sleep(1)  # Add this line
+    time.sleep(1)
     if not thread.is_alive():
         logging.error("Background thread failed to start.")
     app.run(debug=True, threaded=True)
-
 
 if __name__ == "__main__":
     run_app()
