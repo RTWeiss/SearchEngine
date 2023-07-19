@@ -11,13 +11,11 @@ import queue
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import escape
 from datetime import datetime
-from models import db, IndexedURL
 from sqlalchemy import func
 from concurrent.futures import ThreadPoolExecutor
 from threading import Semaphore
 
 MAX_SIMULTANEOUS_INDEXING = 5
-
 DATABASE_URL = os.getenv('DATABASE_URL')
 
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
@@ -25,22 +23,23 @@ if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
-
 lock = Lock()
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db.init_app(app)
-
+db = SQLAlchemy(app)
 executor = ThreadPoolExecutor(max_workers=MAX_SIMULTANEOUS_INDEXING)
 semaphore = Semaphore(MAX_SIMULTANEOUS_INDEXING)
+SITEMAP_QUEUE = queue.Queue()
+CURRENTLY_INDEXING = 0
+
+logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
 class SearchQuery(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    search_term = db.Column(db.String(500))  # Change this line
+    search_term = db.Column(db.String(500))
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     frequency = db.Column(db.Integer, default=1)
-
 
 class SubmittedSitemap(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -49,6 +48,19 @@ class SubmittedSitemap(db.Model):
     status = db.Column(db.String(100), nullable=False)
     total_urls = db.Column(db.Integer, nullable=False)
     indexed_urls = db.Column(db.Integer, nullable=True)
+
+class IndexedURL(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.String(500), nullable=False)
+    title = db.Column(db.String(500), nullable=True)
+    description = db.Column(db.Text, nullable=True)
+    type = db.Column(db.String(50), nullable=True)
+    
+    def __init__(self, url, title, description, type):
+        self.url = url
+        self.title = title
+        self.description = description
+        self.type = type
 
 with app.app_context():
     db.create_all()
