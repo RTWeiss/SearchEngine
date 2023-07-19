@@ -45,10 +45,9 @@ class SubmittedSitemap(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.String(500), nullable=False)
     indexing_status = db.Column(db.String(100), nullable=False)
-    status = db.Column(db.String(100), nullable=False)
+    status = db.Column(db.String(100), nullable=False)  # Add this line
     total_urls = db.Column(db.Integer, nullable=False)
-    indexed_urls = db.Column(db.Integer, nullable=True)
-    indexed_urls = db.relationship('IndexedURL', backref='sitemap', lazy=True)
+    indexed_urls = db.relationship('IndexedURL', backref='sitemap', lazy=True)  # Keep this line
 
 class IndexedURL(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -207,7 +206,6 @@ def index_url(url):
             sitemap.indexed_urls += 1
             db.session.commit()
 
-
 @app.route("/submit", methods=["GET", "POST"])
 def submit():
     if request.method == "POST":
@@ -224,7 +222,6 @@ def submit():
             return render_template("submit.html"), 500
     else:
         return render_template("submit.html")
-
 
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
