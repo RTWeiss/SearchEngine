@@ -60,12 +60,15 @@ def search():
         db.session.add(new_query)
         db.session.commit()
 
+        # Use SQLAlchemy's ilike function for case insensitive searching
         results = IndexedURL.query.filter(
-            IndexedURL.url.contains(search_term) |  # Change query to search_term
-            IndexedURL.title.contains(search_term) |  # Change query to search_term
-            IndexedURL.description.contains(search_term)  # Change query to search_term
+            or_(
+                IndexedURL.url.ilike(f"%{search_term}%"),
+                IndexedURL.title.ilike(f"%{search_term}%"),
+                IndexedURL.description.ilike(f"%{search_term}%")
+            )
         ).all()
-        return render_template('results.html', query=search_term, results=results)  # Change query to search_term
+        return render_template('results.html', query=search_term, results=results)  
     return render_template('search.html')
 
 def start_background_thread():
@@ -90,7 +93,7 @@ def process_sitemap_queue():
 
 def index_sitemap(sitemap_url):
     global CURRENTLY_INDEXING
-    logging.info(f'Called index_sitemap for: {sitemap_url}')  # added logging
+    logging.info(f'Called index_sitemap for: {sitemap_url}')
 
     urls = get_urls_from_sitemap(sitemap_url)
     logging.info(f'Found {len(urls)} URLs in sitemap: {sitemap_url}')
@@ -99,10 +102,10 @@ def index_sitemap(sitemap_url):
     if sitemap:
         with lock:
             sitemap.total_urls = len(urls)
-            sitemap.indexing_status = 'Indexing'  # update status to indexing
-            indexed_url = IndexedURL(url=url)
-            db.session.add(indexed_url)
+            sitemap.indexing_status = 'Indexing'  
+            # moved indexed_url creation into the for loop to avoid referencing before assignment
             db.session.commit()
+
     for url in urls:
         try:
             index_url(url, sitemap)
@@ -112,12 +115,9 @@ def index_sitemap(sitemap_url):
     with lock:
         CURRENTLY_INDEXING -= 1
 
-        # After finishing indexing update status of sitemap
         if sitemap:
-            sitemap.indexing_status = 'Completed'  # update status to completed
+            sitemap.indexing_status = 'Completed'
             db.session.commit()
-
-    process_sitemap_queue()
 
 
 def get_urls_from_sitemap(sitemap_url):
@@ -160,14 +160,12 @@ def index_url(url, sitemap):
         description = page_soup.find("meta", attrs={"name": "description"})
         description = description["content"] if description else "No description available"
 
-        new_indexed_url = IndexedURL(url=url, title=title, description=description, type='sitemap') # Added type
+        new_indexed_url = IndexedURL(url=url, title=title, description=description, type='sitemap')
         db.session.add(new_indexed_url)
-        db.session.commit()  # Ensure that this is happening
-
         if sitemap:
             with lock:
                 sitemap.indexed_urls = sitemap.indexed_urls + 1 if sitemap.indexed_urls else 1
-                db.session.commit()  # Ensure that this is happening
+        db.session.commit()  # consolidated commit operation
     except Exception as e:
         logging.error(f"Failed to index URL: {url}", exc_info=True)
 
@@ -248,12 +246,11 @@ def delete_sitemap():
     return redirect(url_for('dashboard'))
 
 def run_app():
-    thread = threading.Thread(target=start_background_thread, daemon=True) # adding daemon=True
+    thread = threading.Thread(target=start_background_thread, daemon=True)
     thread.start()
-    if not thread.is_alive():  # checking if thread is not alive
-        logging.error("Background thread failed to start.")  # logging an error if the thread failed to start
+    if not thread.is_alive():
+        logging.error("Background thread failed to start.")
     app.run(debug=True, threaded=True)
-
 
 if __name__ == "__main__":
     run_app()
