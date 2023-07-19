@@ -153,6 +153,7 @@ def get_urls_from_sitemap(sitemap_url):
     except Exception as e:
         logging.error(f"Unexpected error getting URLs from XML {sitemap_url}: {e}", exc_info=True)
 
+    logging.info(f"Found {len(urls)} URLs in sitemap: {sitemap_url}")
     return urls
 
 def index_sitemap(sitemap_url, sitemap_id):
@@ -214,8 +215,9 @@ def index_url(url, sitemap_id):
 
     indexed_url = IndexedURL(url=url, title=title, description=description, type=None, sitemap_id=sitemap_id)  
 
+    logging.info(f"Indexing URL: {url}")
     db.session.add(indexed_url)
-    db.session.commit()  # Indexing url to database
+    db.session.commit()
     print(f"Indexed {url}")
 
 def update_sitemap(sitemap, status, total_urls=None, indexed_urls=None):
