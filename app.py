@@ -155,15 +155,6 @@ def get_urls_from_sitemap(sitemap_url):
 
     return urls
 
-def start_background_thread():
-    while True:
-        try:
-            with app.app_context():  # Create new application context
-                process_sitemap_queue()
-        except Exception as e:
-            logging.error(f"Error occurred while processing sitemap queue: {e}", exc_info=True)
-        time.sleep(5)
-
 def index_sitemap(sitemap_url, sitemap_id):
     try:
         urls = get_urls_from_sitemap(sitemap_url)
@@ -295,17 +286,24 @@ def delete_sitemap():
         flash('Sitemap URL not found')
     return redirect(url_for('dashboard'))
 
+def start_background_thread():
+    while True:
+        try:
+            with app.app_context():  # Create new application context
+                if not SITEMAP_QUEUE.empty():
+                    process_sitemap_queue()
+        except Exception as e:
+            logging.error(f"Error occurred while processing sitemap queue: {e}", exc_info=True)
+        time.sleep(5)
+
 def run_app():
     thread = threading.Thread(target=start_background_thread, daemon=True)
     thread.start()
-    indexing_thread = threading.Thread(target=process_sitemap_queue, daemon=True)  # Add this line
-    indexing_thread.start()  # Add this line
     time.sleep(1)
     if not thread.is_alive():
         logging.error("Background thread failed to start.")
-    if not indexing_thread.is_alive():  # Add this line
-        logging.error("Indexing thread failed to start.")  # Add this line
     app.run(debug=True, threaded=True)
+
 
 if __name__ == "__main__":
     run_app()
