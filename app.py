@@ -106,8 +106,10 @@ def update_sitemap(sitemap, status, total_urls=None, indexed_urls=None):
             sitemap.total_urls = total_urls
         db.session.commit()
         if indexed_urls is not None:
-            sitemap.indexed_urls = indexed_urls
-        db.session.commit()
+            for url in indexed_urls:
+                new_url = IndexedURL(url=url, sitemap_id=sitemap.id)  # Adjust this line according to your IndexedURL model
+                db.session.add(new_url)
+            db.session.commit()
 
 def get_urls_from_sitemap(sitemap_url):
     response = requests.get(sitemap_url)
@@ -218,7 +220,7 @@ def index_url(url, sitemap):  # sitemap argument added here
     db.session.add(indexed_url)
     db.session.commit()
     print(f"Indexed {url}")
-    
+
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
     try:
