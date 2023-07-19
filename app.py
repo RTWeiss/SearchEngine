@@ -194,10 +194,11 @@ def index_sitemap(sitemap_url):
     sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
     if sitemap:
         update_sitemap(sitemap, 'Indexing', total_urls=len(urls))  # Update total_urls
+    indexed_count = 0  # Initialize indexed_count
     for url in urls:
-        index_url(url, sitemap)  # Added sitemap argument here
-  
-def index_url(url, sitemap):  # sitemap argument added here
+        index_url(url, sitemap, indexed_count)  # Added indexed_count argument here
+
+def index_url(url, sitemap, indexed_count):  # sitemap argument added here
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()  # Will raise an HTTPError if the response was unsuccessful
@@ -217,9 +218,10 @@ def index_url(url, sitemap):  # sitemap argument added here
 
     db.session.add(indexed_url)
     db.session.commit()
+    indexed_count += 1  # Increment indexed_count after successful commit
     print(f"Indexed {url}")
     if sitemap:
-        update_sitemap(sitemap, 'Indexing', indexed_urls=len(sitemap.indexed_urls))  # Update indexed_urls
+        update_sitemap(sitemap, 'Indexing', indexed_urls=indexed_count)  # Update indexed_urls
 
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
