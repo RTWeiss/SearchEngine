@@ -68,25 +68,22 @@ def search():
         return render_template('results.html', query=search_term, results=results)  # Change query to search_term
     return render_template('search.html')
 
-
 def start_background_thread():
     while True:
         try:
-            process_sitemap_queue()
+            sitemap_url = SITEMAP_QUEUE.get()  # This will block until an item is available
+            process_sitemap_queue(sitemap_url)
         except Exception as e:
             logging.error(f"Error occurred while processing sitemap queue: {e}", exc_info=True)
-        time.sleep(5)
 
-def process_sitemap_queue():
+def process_sitemap_queue(sitemap_url):
     global CURRENTLY_INDEXING
-    while not SITEMAP_QUEUE.empty():
-        with lock:
-            if CURRENTLY_INDEXING < MAX_SIMULTANEOUS_INDEXING:
-                sitemap_url = SITEMAP_QUEUE.get()
-                indexing_thread = threading.Thread(target=index_sitemap, args=(sitemap_url,))
-                indexing_thread.start()
-                CURRENTLY_INDEXING += 1
-                logging.info(f'Started indexing thread for: {sitemap_url}')
+    with lock:
+        if CURRENTLY_INDEXING < MAX_SIMULTANEOUS_INDEXING:
+            indexing_thread = threading.Thread(target=index_sitemap, args=(sitemap_url,))
+            indexing_thread.start()
+            CURRENTLY_INDEXING += 1
+            logging.info(f'Started indexing thread for: {sitemap_url}')
 
 def index_sitemap(sitemap_url):
     global CURRENTLY_INDEXING
@@ -160,12 +157,12 @@ def index_url(url, sitemap):
 
         new_indexed_url = IndexedURL(url=url, title=title, description=description, type='sitemap') # Added type
         db.session.add(new_indexed_url)
-        db.session.commit()
+        db.session.commit()  # Ensure that this is happening
 
         if sitemap:
             with lock:
                 sitemap.indexed_urls = sitemap.indexed_urls + 1 if sitemap.indexed_urls else 1
-                db.session.commit()
+                db.session.commit()  # Ensure that this is happening
     except Exception as e:
         logging.error(f"Failed to index URL: {url}", exc_info=True)
 
