@@ -105,37 +105,26 @@ def update_sitemap(sitemap, status, total_urls=None, indexed_urls=None):
 
 def process_sitemap_queue():
     while not SITEMAP_QUEUE.empty():
-        semaphore.acquire()
         sitemap_url = SITEMAP_QUEUE.get()
-        logging.info(f'Starting a new indexing thread for: {sitemap_url}')
-        executor.submit(index_sitemap, sitemap_url)
-
-def index_sitemap(sitemap_url):
-    global CURRENTLY_INDEXING
-    logging.info(f'Called index_sitemap for: {sitemap_url}')
-
-    urls = get_urls_from_sitemap(sitemap_url)
-    logging.info(f'Found {len(urls)} URLs in sitemap: {sitemap_url}')
-
-    sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
-    if sitemap:
-        with lock:
-            sitemap.total_urls = len(urls)
-            sitemap.indexing_status = 'Indexing'  
+        sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
+        if sitemap:
+            sitemap.indexing_status = 'Indexing'
             db.session.commit()
-
-    for url in urls:
-        try:
-            index_url(url, 'sitemap', sitemap)  # Here I added 'sitemap' as the type
-        except Exception as e:
-            logging.error(f"Error occurred while indexing URL {url}: {e}", exc_info=True)
-
-    with lock:
-        CURRENTLY_INDEXING -= 1
-
+        index_sitemap(sitemap_url)
         if sitemap:
             sitemap.indexing_status = 'Completed'
             db.session.commit()
+
+def index_sitemap(sitemap_url):
+    response = requests.get(sitemap_url)
+    soup = BeautifulSoup(response.text, "xml")
+    urls = [url.text for url in soup.find_all("loc")]
+    sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
+    if sitemap:
+        sitemap.total_urls = len(urls)
+        db.session.commit()
+    for url in urls:
+        index_url(url)
 
 def get_urls_from_sitemap(sitemap_url):
     response = requests.get(sitemap_url)
@@ -169,46 +158,29 @@ def get_urls_from_sitemap(sitemap_url):
 
     return urls
 
-def index_url(url, url_type, sitemap):  # New parameter 'url_type' added here
-    try:
-        res = requests.get(url)
-        page_soup = BeautifulSoup(res.text, "html.parser")
-        title = page_soup.find("title").text if page_soup.find("title") else url
-        description = page_soup.find("meta", attrs={"name": "description"})
-        description = description["content"] if description else "No description available"
-
-        new_indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
-        db.session.add(new_indexed_url)
-        if sitemap:
-            with lock:
-                sitemap.indexed_urls = sitemap.indexed_urls + 1 if sitemap.indexed_urls else 1
+def index_url(url):
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, "html.parser")
+    title = soup.find("title").text if soup.find("title") else None
+    description = soup.find("meta", attrs={"name": "description"}).get("content") if soup.find("meta", attrs={"name": "description"}) else None
+    indexed_url = IndexedURL(url=url, title=title, description=description)
+    db.session.add(indexed_url)
+    sitemap = SubmittedSitemap.query.filter(SubmittedSitemap.url.contains(url.rsplit('/', 1)[0])).first()
+    if sitemap:
+        sitemap.indexed_urls = SubmittedSitemap.indexed_urls + 1
         db.session.commit()
-    except Exception as e:
-        logging.error(f"Failed to index URL: {url}", exc_info=True)
-
+        
 @app.route("/submit", methods=["GET", "POST"])
 def submit():
     if request.method == "POST":
         sitemap_url = request.form["sitemap_url"]
-        total_urls = len(get_urls_from_sitemap(sitemap_url))  # get total urls at this point
-        new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='Added to queue', status='Not started',
-                                       total_urls=total_urls, indexed_urls=0)
+        new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='In queue', status='Not started', total_urls=0, indexed_urls=0)
         db.session.add(new_sitemap)
         db.session.commit()
         SITEMAP_QUEUE.put(sitemap_url)
-
-        # Update the status of the SubmittedSitemap
-        with lock:
-            new_sitemap.status = 'Started'
-            db.session.commit()
-
-        executor.submit(process_sitemap_queue)  # submit to executor here
-
-        flash("Sitemap submitted successfully.")
         return redirect(url_for('submit'))
     else:
         return render_template("submit.html")
-
 
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
