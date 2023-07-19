@@ -187,36 +187,50 @@ def index_url(url, sitemap_id):  # sitemap argument is sitemap_id here
     print(f"Indexed {url}")
 
 def get_urls_from_sitemap(sitemap_url):
-    response = requests.get(sitemap_url)
-    soup = BeautifulSoup(response.text, "xml")
+    try:
+        response = requests.get(sitemap_url)
+        soup = BeautifulSoup(response.text, "xml")
+    except Exception as e:
+        logging.error(f"Error parsing XML from {sitemap_url}: {e}", exc_info=True)
+        return []
+
     urls = []
 
     # Handle normal sitemap with <url> tags
-    url_tags = soup.find_all("url")
-    urls.extend([url.loc.string for url in url_tags])
+    try:
+        url_tags = soup.find_all("url")
+        urls.extend([url.loc.string for url in url_tags])
+    except Exception as e:
+        logging.error(f"Error getting URLs from XML {sitemap_url}: {e}", exc_info=True)
 
     # Handle sitemap index files with <sitemap> tags
-    sitemap_tags = soup.find_all("sitemap")
-    for sitemap in sitemap_tags:
-        sitemap_response = requests.get(sitemap.loc.string)
-        sitemap_soup = BeautifulSoup(sitemap_response.text, "xml")
-        url_tags = sitemap_soup.find_all("url")
-        urls.extend([url.loc.string for url in url_tags])
+    try:
+        sitemap_tags = soup.find_all("sitemap")
+        for sitemap in sitemap_tags:
+            sitemap_response = requests.get(sitemap.loc.string)
+            sitemap_soup = BeautifulSoup(sitemap_response.text, "xml")
+            url_tags = sitemap_soup.find_all("url")
+            urls.extend([url.loc.string for url in url_tags])
+    except Exception as e:
+        logging.error(f"Error getting sitemap from XML {sitemap_url}: {e}", exc_info=True)
 
     # Handle case where sitemap contains links to other .xml files
-    # Assuming these links are in <loc> tags
-    xml_loc_tags = soup.find_all("loc")
-    for xml_url in xml_loc_tags:
-        # Checking if the url is of an xml file
-        if xml_url.text.endswith('.xml'):
-            # Make a request to the xml file
-            xml_response = requests.get(xml_url.text)
-            xml_soup = BeautifulSoup(xml_response.text, "xml")
-            # Extract all urls from the xml file
-            xml_url_tags = xml_soup.find_all("loc")
-            urls.extend([url.string for url in xml_url_tags])
+    try:
+        xml_loc_tags = soup.find_all("loc")
+        for xml_url in xml_loc_tags:
+            # Checking if the url is of an xml file
+            if xml_url.text.endswith('.xml'):
+                # Make a request to the xml file
+                xml_response = requests.get(xml_url.text)
+                xml_soup = BeautifulSoup(xml_response.text, "xml")
+                # Extract all urls from the xml file
+                xml_url_tags = xml_soup.find_all("loc")
+                urls.extend([url.string for url in xml_url_tags])
+    except Exception as e:
+        logging.error(f"Error getting XML loc tags from {sitemap_url}: {e}", exc_info=True)
 
     return urls
+
 
 def update_sitemap(sitemap, status, total_urls=None, indexed_urls=None):
     with lock:
