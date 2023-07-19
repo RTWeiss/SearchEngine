@@ -151,8 +151,11 @@ def index_sitemap(sitemap_url, sitemap_id):
         sitemap = SubmittedSitemap.query.get(sitemap_id)
         if sitemap:
             sitemap.indexing_status = 'Indexing'
-            sitemap.total_urls = len(urls)  # Update total_urls
-            db.session.commit()
+            try:
+                sitemap.total_urls = len(urls)  # Update total_urls
+                db.session.commit()
+            except Exception as e:
+                logging.error(f"An error occurred while saving total_urls: {str(e)}", exc_info=True)
         for url in urls:
             index_url(url, sitemap.id)  # Pass sitemap_id here
         if sitemap:
@@ -164,6 +167,7 @@ def index_sitemap(sitemap_url, sitemap_id):
         if sitemap:
             sitemap.indexing_status = 'Failed'
             db.session.commit()
+
 
 def index_url(url, sitemap_id):  # sitemap argument is sitemap_id here
     try:
