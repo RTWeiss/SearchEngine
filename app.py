@@ -172,9 +172,10 @@ def index_url(url):
     description = soup.find("meta", attrs={"name": "description"}).get("content") if soup.find("meta", attrs={"name": "description"}) else None
     indexed_url = IndexedURL(url=url, title=title, description=description)
     db.session.add(indexed_url)
+    db.session.commit()  # Commit after adding indexed_url
     sitemap = SubmittedSitemap.query.filter(SubmittedSitemap.url.contains(url.rsplit('/', 1)[0])).first()
     if sitemap:
-        sitemap.indexed_urls = SubmittedSitemap.indexed_urls + 1
+        sitemap.indexed_urls += 1
         db.session.commit()
 
 @app.route("/submit", methods=["GET", "POST"])
