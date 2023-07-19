@@ -175,10 +175,17 @@ def submit():
         db.session.add(new_sitemap)
         db.session.commit()
         SITEMAP_QUEUE.put(sitemap_url)
+        
+        # Update the status of the SubmittedSitemap
+        with lock:
+            new_sitemap.status = 'Started'
+            db.session.commit()
+
         flash("Sitemap submitted successfully.")
         return redirect(url_for('submit'))
     else:
         return render_template("submit.html")
+
 
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
