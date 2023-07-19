@@ -298,10 +298,15 @@ def delete_sitemap():
 def run_app():
     thread = threading.Thread(target=start_background_thread, daemon=True)
     thread.start()
+    indexing_thread = threading.Thread(target=process_sitemap_queue, daemon=True)  # Add this line
+    indexing_thread.start()  # Add this line
     time.sleep(1)
     if not thread.is_alive():
         logging.error("Background thread failed to start.")
+    if not indexing_thread.is_alive():  # Add this line
+        logging.error("Indexing thread failed to start.")  # Add this line
     app.run(debug=True, threaded=True)
 
 if __name__ == "__main__":
     run_app()
+
