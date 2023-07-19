@@ -166,17 +166,33 @@ def get_urls_from_sitemap(sitemap_url):
     return urls
 
 def index_url(url):
-    response = requests.get(url)
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()  # Will raise an HTTPError if the response was unsuccessful
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to fetch {url}: {e}")
+        logging.error(f"Failed to fetch {url}: {e}", exc_info=True)
+        return
+
     soup = BeautifulSoup(response.text, "html.parser")
-    title = soup.find("title").text if soup.find("title") else None
-    description = soup.find("meta", attrs={"name": "description"}).get("content") if soup.find("meta", attrs={"name": "description"}) else None
+    title = soup.find("title")
+    title = title.text if title else "N/A"
+
+    description_tag = soup.find("meta", attrs={"name": "description"})
+    description = description_tag.get("content") if description_tag else "N/A"
+
     indexed_url = IndexedURL(url=url, title=title, description=description)
+
     db.session.add(indexed_url)
-    db.session.commit()  # Commit after adding indexed_url
+    db.session.commit()
+    print(f"Indexed {url}")
+
     sitemap = SubmittedSitemap.query.filter(SubmittedSitemap.url.contains(url.rsplit('/', 1)[0])).first()
     if sitemap:
-        sitemap.indexed_urls += 1
-        db.session.commit()
+        with lock:
+            sitemap.indexed_urls += 1
+            db.session.commit()
+
 
 @app.route("/submit", methods=["GET", "POST"])
 def submit():
