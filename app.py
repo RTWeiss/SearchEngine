@@ -79,15 +79,14 @@ def start_background_thread():
 
 def process_sitemap_queue():
     global CURRENTLY_INDEXING
-    while not SITEMAP_QUEUE.empty():
+    while not SITEMAP_QUEUE.empty() and CURRENTLY_INDEXING < MAX_SIMULTANEOUS_INDEXING:  # Consolidate condition checks
+        sitemap_url = SITEMAP_QUEUE.get()
+        logging.info(f'Starting a new indexing thread for: {sitemap_url}')
+        indexing_thread = threading.Thread(target=index_sitemap, args=(sitemap_url,))
+        indexing_thread.start()
         with lock:
-            if CURRENTLY_INDEXING < MAX_SIMULTANEOUS_INDEXING:
-                sitemap_url = SITEMAP_QUEUE.get()
-                logging.info(f'Starting a new indexing thread for: {sitemap_url}')  # added logging
-                indexing_thread = threading.Thread(target=index_sitemap, args=(sitemap_url,))
-                indexing_thread.start()
-                CURRENTLY_INDEXING += 1
-                logging.info(f'Started indexing thread for: {sitemap_url}')
+            CURRENTLY_INDEXING += 1
+        logging.info(f'Started indexing thread for: {sitemap_url}')
 
 def index_sitemap(sitemap_url):
     global CURRENTLY_INDEXING
@@ -101,8 +100,9 @@ def index_sitemap(sitemap_url):
         with lock:
             sitemap.total_urls = len(urls)
             sitemap.indexing_status = 'Indexing'  # update status to indexing
+            indexed_url = IndexedURL(url=url)
+            db.session.add(indexed_url)
             db.session.commit()
-
     for url in urls:
         try:
             index_url(url, sitemap)
