@@ -103,7 +103,8 @@ def increment_currently_indexing():
 def submit():
     if request.method == "POST":
         sitemap_url = request.form["sitemap_url"]
-        new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='In queue', status='In queue', total_urls=0)
+        urls = get_urls_from_sitemap(sitemap_url)
+        new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='In queue', status='In queue', total_urls=len(urls))
         try:
             db.session.add(new_sitemap)
             db.session.commit()
@@ -115,7 +116,7 @@ def submit():
             return render_template("submit.html"), 500
     else:
         return render_template("submit.html")
-    
+ 
 def get_urls_from_sitemap(sitemap_url):
     urls = []
 
@@ -191,18 +192,13 @@ def process_sitemap_queue():
 def index_sitemap(sitemap_url, sitemap_id):
     try:
         urls = get_urls_from_sitemap(sitemap_url)
-        sitemap = SubmittedSitemap.query.get(sitemap_id)
-        if sitemap:
-            sitemap.indexing_status = 'Indexing'
-            sitemap.total_urls = len(urls)  # Saving total number of urls to database
-            db.session.commit()
-        # This will index all urls even if one fails
         for url in urls:
             try:
                 index_url(url, sitemap.id)
             except Exception as e:
                 logging.error(f"An error occurred while indexing URL: {url}. Error: {str(e)}", exc_info=True)
                 
+        sitemap = SubmittedSitemap.query.get(sitemap_id)
         if sitemap:
             sitemap.indexing_status = 'Completed'
             db.session.commit()
