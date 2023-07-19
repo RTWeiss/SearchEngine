@@ -111,30 +111,31 @@ def process_sitemap_queue():
         executor.submit(index_sitemap, sitemap_url)
 
 def index_sitemap(sitemap_url):
-    try:
-        logging.info(f'Called index_sitemap for: {sitemap_url}')
+    global CURRENTLY_INDEXING
+    logging.info(f'Called index_sitemap for: {sitemap_url}')
 
-        urls = get_urls_from_sitemap(sitemap_url)
-        logging.info(f'Found {len(urls)} URLs in sitemap: {sitemap_url}')
+    urls = get_urls_from_sitemap(sitemap_url)
+    logging.info(f'Found {len(urls)} URLs in sitemap: {sitemap_url}')
 
-        sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
+    sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
+    if sitemap:
+        with lock:
+            sitemap.total_urls = len(urls)
+            sitemap.indexing_status = 'Indexing'  
+            db.session.commit()
+
+    for url in urls:
+        try:
+            index_url(url, 'sitemap', sitemap)  # Here I added 'sitemap' as the type
+        except Exception as e:
+            logging.error(f"Error occurred while indexing URL {url}: {e}", exc_info=True)
+
+    with lock:
+        CURRENTLY_INDEXING -= 1
+
         if sitemap:
-            update_sitemap(sitemap, 'Indexing', total_urls=len(urls))
-
-        for url in urls:
-            try:
-                index_url(url, sitemap)
-            except Exception as e:
-                logging.error(f"Error occurred while indexing URL {url}: {e}", exc_info=True)
-        
-        if sitemap:
-            update_sitemap(sitemap, 'Completed')
-
-    except Exception as e:
-        logging.error(f"Error occurred in index_sitemap for {sitemap_url}: {e}", exc_info=True)
-    finally:
-        decrement_currently_indexing()
-        semaphore.release() 
+            sitemap.indexing_status = 'Completed'
+            db.session.commit()
 
 def get_urls_from_sitemap(sitemap_url):
     response = requests.get(sitemap_url)
@@ -168,7 +169,7 @@ def get_urls_from_sitemap(sitemap_url):
 
     return urls
 
-def index_url(url, sitemap):
+def index_url(url, url_type, sitemap):  # New parameter 'url_type' added here
     try:
         res = requests.get(url)
         page_soup = BeautifulSoup(res.text, "html.parser")
@@ -176,12 +177,12 @@ def index_url(url, sitemap):
         description = page_soup.find("meta", attrs={"name": "description"})
         description = description["content"] if description else "No description available"
 
-        new_indexed_url = IndexedURL(url=url, title=title, description=description, type='sitemap')
+        new_indexed_url = IndexedURL(url=url, title=title, description=description, type=url_type)
         db.session.add(new_indexed_url)
         if sitemap:
             with lock:
                 sitemap.indexed_urls = sitemap.indexed_urls + 1 if sitemap.indexed_urls else 1
-        db.session.commit()  # consolidated commit operation
+        db.session.commit()
     except Exception as e:
         logging.error(f"Failed to index URL: {url}", exc_info=True)
 
