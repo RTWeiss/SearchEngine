@@ -161,12 +161,8 @@ def index_sitemap(sitemap_url, sitemap_id):
         urls = get_urls_from_sitemap(sitemap_url)
         indexed_urls = []
         for url in urls:
-            indexed_url = IndexedURL(url=url, title=None, description=None, type=None, sitemap_id=sitemap_id)
-            indexed_urls.append(indexed_url)
-        
-        db.session.bulk_save_objects(indexed_urls)
-        db.session.commit()
-        
+            index_url(url, sitemap_id)  # Index each URL using the index_url function
+            
         sitemap = SubmittedSitemap.query.get(sitemap_id)
         if sitemap:
             sitemap.indexing_status = 'Completed'
@@ -177,6 +173,7 @@ def index_sitemap(sitemap_url, sitemap_id):
         if sitemap:
             sitemap.indexing_status = 'Failed'
             db.session.commit()
+
 
 
 def process_sitemap_queue():
