@@ -104,10 +104,10 @@ def update_sitemap(sitemap, status, total_urls=None, indexed_urls=None):
         sitemap.indexing_status = status
         if total_urls is not None:
             sitemap.total_urls = total_urls
+        db.session.commit()
         if indexed_urls is not None:
             sitemap.indexed_urls = indexed_urls
-    db.session.commit()
-
+        db.session.commit()
 
 def get_urls_from_sitemap(sitemap_url):
     response = requests.get(sitemap_url)
@@ -194,9 +194,8 @@ def index_sitemap(sitemap_url):
     sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
     if sitemap:
         update_sitemap(sitemap, 'Indexing', total_urls=len(urls))  # Update total_urls
-    indexed_count = 0  # Initialize indexed_count
     for url in urls:
-        index_url(url, sitemap, indexed_count)  # Added indexed_count argument here
+        index_url(url, sitemap)
 
 def index_url(url, sitemap, indexed_count):  # sitemap argument added here
     try:
@@ -231,7 +230,7 @@ def dashboard():
             sitemap.url: {
                 'indexing_status': sitemap.indexing_status,
                 'total_urls': sitemap.total_urls,
-                'indexed_urls': sitemap.indexed_urls,
+                'indexed_urls': len(sitemap.indexed_urls),  # Use the length of indexed_urls
             }
             for sitemap in submitted_sitemaps
         }
