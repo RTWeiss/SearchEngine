@@ -133,7 +133,7 @@ def process_sitemap_queue():
             sitemap.indexing_status = 'Indexing'
             db.session.commit()
         try:
-            index_sitemap(sitemap_url)
+            index_sitemap(sitemap_url, sitemap.id)  # Pass sitemap.id as well
             if sitemap:
                 sitemap.indexing_status = 'Completed'
                 db.session.commit()
