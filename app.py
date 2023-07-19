@@ -159,12 +159,14 @@ def get_urls_from_sitemap(sitemap_url):
 def index_sitemap(sitemap_url, sitemap_id):
     try:
         urls = get_urls_from_sitemap(sitemap_url)
+        indexed_urls = []
         for url in urls:
-            try:
-                index_url(url, sitemap_id)  # Replaced scrape_and_index_url with index_url
-            except Exception as e:
-                logging.error(f"An error occurred while indexing URL: {url}. Error: {str(e)}", exc_info=True)
-                
+            indexed_url = IndexedURL(url=url, title=None, description=None, type=None, sitemap_id=sitemap_id)
+            indexed_urls.append(indexed_url)
+        
+        db.session.bulk_save_objects(indexed_urls)
+        db.session.commit()
+        
         sitemap = SubmittedSitemap.query.get(sitemap_id)
         if sitemap:
             sitemap.indexing_status = 'Completed'
@@ -175,6 +177,7 @@ def index_sitemap(sitemap_url, sitemap_id):
         if sitemap:
             sitemap.indexing_status = 'Failed'
             db.session.commit()
+
 
 def process_sitemap_queue():
     while True:  # Change this to while True, it will be always checking the DB for sitemaps in queue.
