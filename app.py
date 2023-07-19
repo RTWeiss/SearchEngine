@@ -69,50 +69,6 @@ CURRENTLY_INDEXING = 0
 
 logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
-@app.route('/', methods=['GET', 'POST'])
-def search():
-    if request.method == 'POST':
-        search_term = request.form.get('query').lower()  
-        new_query = SearchQuery(search_term=search_term)  
-        db.session.add(new_query)
-        db.session.commit()
-
-        results = IndexedURL.query.filter(
-            IndexedURL.url.contains(search_term) |  # Change query to search_term
-            IndexedURL.title.contains(search_term) |  # Change query to search_term
-            IndexedURL.description.contains(search_term)  # Change query to search_term
-        ).all()
-        return render_template('results.html', query=search_term, results=results)  # Change query to search_term
-    return render_template('search.html')
-
-def decrement_currently_indexing():
-    global CURRENTLY_INDEXING
-    with lock:
-        CURRENTLY_INDEXING -= 1
-
-def increment_currently_indexing():
-    global CURRENTLY_INDEXING
-    with lock:
-        CURRENTLY_INDEXING += 1
-
-@app.route("/submit", methods=["GET", "POST"])
-def submit():
-    if request.method == "POST":
-        sitemap_url = request.form["sitemap_url"]
-        urls = get_urls_from_sitemap(sitemap_url)
-        new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='In queue', status='In queue', total_urls=len(urls))
-        try:
-            db.session.add(new_sitemap)
-            db.session.commit()
-            SITEMAP_QUEUE.put(sitemap_url)
-            return redirect(url_for('submit'))
-        except Exception as e:
-            logging.error(f"An error occurred while saving the sitemap: {e}", exc_info=True)
-            flash("An error occurred while saving the sitemap. Please try again.")
-            return render_template("submit.html"), 500
-    else:
-        return render_template("submit.html")
- 
 def get_urls_from_sitemap(sitemap_url):
     urls = []
 
@@ -156,42 +112,6 @@ def get_urls_from_sitemap(sitemap_url):
     logging.info(f"Found {len(urls)} URLs in sitemap: {sitemap_url}")
     return urls
 
-def index_sitemap(sitemap_url, sitemap_id):
-    try:
-        urls = get_urls_from_sitemap(sitemap_url)
-        indexed_urls = []
-        for url in urls:
-            index_url(url, sitemap_id)
-            indexed_urls.append(url)
-            
-        sitemap = SubmittedSitemap.query.get(sitemap_id)
-        if sitemap:
-            update_sitemap(sitemap, 'Completed', indexed_urls=indexed_urls)
-    except Exception as e:
-        logging.error(f"An error occurred while indexing sitemap: {sitemap_url}. Error: {str(e)}", exc_info=True)
-        sitemap = SubmittedSitemap.query.get(sitemap_id)
-        if sitemap:
-            update_sitemap(sitemap, 'Failed')
-
-def process_sitemap_queue():
-    while True:
-        semaphore.acquire()
-        sitemap = SubmittedSitemap.query.filter_by(indexing_status='In queue').first()
-        if not sitemap:
-            semaphore.release()
-            time.sleep(1)
-            continue
-        sitemap.indexing_status = 'Indexing'
-        db.session.commit()
-        try:
-            index_sitemap(sitemap.url, sitemap.id)
-        except Exception as e:
-            logging.error(f"Error occurred while indexing sitemap: {e}", exc_info=True)
-            sitemap.indexing_status = 'Failed'
-            db.session.commit()
-        finally:
-            semaphore.release()
-
 def index_url(url, sitemap_id):
     try:
         response = requests.get(url, timeout=10)
@@ -226,6 +146,58 @@ def update_sitemap(sitemap, status, total_urls=None, indexed_urls=None):
                 new_url = IndexedURL(url=url, sitemap_id=sitemap.id)  # Adjust this line according to your IndexedURL model
                 db.session.add(new_url)
             db.session.commit()
+
+@app.route('/', methods=['GET', 'POST'])
+def search():
+    if request.method == 'POST':
+        search_term = request.form.get('query').lower()  
+        new_query = SearchQuery(search_term=search_term)  
+        db.session.add(new_query)
+        db.session.commit()
+
+        results = IndexedURL.query.filter(
+            IndexedURL.url.contains(search_term) |  # Change query to search_term
+            IndexedURL.title.contains(search_term) |  # Change query to search_term
+            IndexedURL.description.contains(search_term)  # Change query to search_term
+        ).all()
+        return render_template('results.html', query=search_term, results=results)  # Change query to search_term
+    return render_template('search.html')
+
+
+@app.route("/submit", methods=["GET", "POST"])
+def submit():
+    if request.method == "POST":
+        sitemap_url = request.form["sitemap_url"]
+        urls = get_urls_from_sitemap(sitemap_url)
+        new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='In queue', status='In queue', total_urls=len(urls))
+        try:
+            db.session.add(new_sitemap)
+            db.session.commit()
+            SITEMAP_QUEUE.put(sitemap_url)
+            return redirect(url_for('submit'))
+        except Exception as e:
+            logging.error(f"An error occurred while saving the sitemap: {e}", exc_info=True)
+            flash("An error occurred while saving the sitemap. Please try again.")
+            return render_template("submit.html"), 500
+    else:
+        return render_template("submit.html")
+
+def index_sitemap(sitemap_url, sitemap_id):
+    try:
+        urls = get_urls_from_sitemap(sitemap_url)
+        indexed_urls = []
+        for url in urls:
+            index_url(url, sitemap_id)
+            indexed_urls.append(url)
+            
+        sitemap = SubmittedSitemap.query.get(sitemap_id)
+        if sitemap:
+            update_sitemap(sitemap, 'Completed', indexed_urls=indexed_urls)
+    except Exception as e:
+        logging.error(f"An error occurred while indexing sitemap: {sitemap_url}. Error: {str(e)}", exc_info=True)
+        sitemap = SubmittedSitemap.query.get(sitemap_id)
+        if sitemap:
+            update_sitemap(sitemap, 'Failed')
 
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
@@ -281,6 +253,35 @@ def delete_sitemap():
     else:
         flash('Sitemap URL not found')
     return redirect(url_for('dashboard'))
+
+def process_sitemap_queue():
+    while True:
+        semaphore.acquire()
+        sitemap = SubmittedSitemap.query.filter_by(indexing_status='In queue').first()
+        if not sitemap:
+            semaphore.release()
+            time.sleep(1)
+            continue
+        sitemap.indexing_status = 'Indexing'
+        db.session.commit()
+        try:
+            index_sitemap(sitemap.url, sitemap.id)
+        except Exception as e:
+            logging.error(f"Error occurred while indexing sitemap: {e}", exc_info=True)
+            sitemap.indexing_status = 'Failed'
+            db.session.commit()
+        finally:
+            semaphore.release()
+            
+def decrement_currently_indexing():
+    global CURRENTLY_INDEXING
+    with lock:
+        CURRENTLY_INDEXING -= 1
+
+def increment_currently_indexing():
+    global CURRENTLY_INDEXING
+    with lock:
+        CURRENTLY_INDEXING += 1
 
 def start_background_thread():
     while True:
