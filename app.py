@@ -90,6 +90,7 @@ def process_sitemap_queue():
 
 def index_sitemap(sitemap_url):
     global CURRENTLY_INDEXING
+    logging.info(f'Called index_sitemap for: {sitemap_url}')  # added logging
 
     urls = get_urls_from_sitemap(sitemap_url)
     logging.info(f'Found {len(urls)} URLs in sitemap: {sitemap_url}')
