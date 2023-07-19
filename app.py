@@ -14,6 +14,8 @@ from datetime import datetime
 from sqlalchemy import func
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Semaphore
+from flask import copy_current_request_context
+
 
 MAX_SIMULTANEOUS_INDEXING = 5
 DATABASE_URL = os.getenv('DATABASE_URL')
@@ -117,7 +119,8 @@ def submit():
 def start_background_thread():
     while True:
         try:
-            process_sitemap_queue()
+            with app.app_context():  # Create new application context
+                process_sitemap_queue()
         except Exception as e:
             logging.error(f"Error occurred while processing sitemap queue: {e}", exc_info=True)
         time.sleep(5)
