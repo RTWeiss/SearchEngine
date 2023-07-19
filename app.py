@@ -215,7 +215,7 @@ def index_url(url, sitemap_id):
     description_tag = soup.find("meta", attrs={"name": "description"})
     description = description_tag.get("content") if description_tag else "N/A"
 
-    indexed_url = IndexedURL(url=url, title=title, description=description, type=None, sitemap_id=sitemap_id)  
+    indexed_url = IndexedURL(url=url, title=title, description=description, type=None, sitemap_id=sitemap_id)
 
     logging.info(f"Indexing URL: {url}")
     db.session.add(indexed_url)
