@@ -12,7 +12,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import escape
 from datetime import datetime
 from sqlalchemy import func
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Semaphore
 
 MAX_SIMULTANEOUS_INDEXING = 5
@@ -103,20 +103,19 @@ def submit():
         sitemap_url = request.form["sitemap_url"]
         new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='In queue', status='Not started', total_urls=0)
         try:
-            with db.session.begin():
-                db.session.add(new_sitemap)
-            increment_currently_indexing()  # increment the indexing count
-            index_sitemap(sitemap_url)  # call index_sitemap function here
-            SITEMAP_QUEUE.put(sitemap_url)
+            db.session.add(new_sitemap)
+            db.session.commit()
+            semaphore.acquire()  # Control the number of simultaneous indexings
+            future = executor.submit(index_sitemap, sitemap_url, new_sitemap.id)  # call index_sitemap function here
+            future.add_done_callback(lambda x: semaphore.release())  # Release the semaphore when done
             return redirect(url_for('submit'))
         except Exception as e:
             logging.error(f"An error occurred while saving the sitemap: {e}", exc_info=True)
             flash("An error occurred while saving the sitemap. Please try again.")
-            decrement_currently_indexing()  # decrement the indexing count in case of error
             return render_template("submit.html"), 500
     else:
         return render_template("submit.html")
-
+    
 def start_background_thread():
     while True:
         try:
@@ -146,24 +145,31 @@ def process_sitemap_queue():
         finally:
             semaphore.release()  # Release the semaphore after indexing is completed
 
-def index_sitemap(sitemap_url):
-    urls = get_urls_from_sitemap(sitemap_url)
-    sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
-    if sitemap:
-        update_sitemap(sitemap, 'Indexing', total_urls=len(urls))  # Update total_urls
-    for url in urls:
-        index_url(url, sitemap)  # Pass sitemap object here
-    if sitemap:
-        sitemap.total_urls = len(urls)  # Update total_urls after indexing is done
-        db.session.commit()
-
+def index_sitemap(sitemap_url, sitemap_id):
+    try:
+        urls = get_urls_from_sitemap(sitemap_url)
+        sitemap = SubmittedSitemap.query.get(sitemap_id)
+        if sitemap:
+            sitemap.indexing_status = 'Indexing'
+            sitemap.total_urls = len(urls)  # Update total_urls
+            db.session.commit()
+        for url in urls:
+            index_url(url, sitemap)  # Pass sitemap object here
+        if sitemap:
+            sitemap.indexing_status = 'Completed'  # Update status after indexing is done
+            db.session.commit()
+    except Exception as e:
+        logging.error(f"An error occurred while indexing sitemap: {sitemap_url}. Error: {str(e)}", exc_info=True)
+        sitemap = SubmittedSitemap.query.get(sitemap_id)
+        if sitemap:
+            sitemap.indexing_status = 'Failed'
+            db.session.commit()
 
 def index_url(url, sitemap):  # sitemap argument added here
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()  # Will raise an HTTPError if the response was unsuccessful
     except requests.exceptions.RequestException as e:
-        print(f"Failed to fetch {url}: {e}")
         logging.error(f"Failed to fetch {url}: {e}", exc_info=True)
         return
 
