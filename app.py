@@ -151,7 +151,6 @@ def index_sitemap(sitemap_url, sitemap_id):
             sitemap.indexing_status = 'Indexing'
             sitemap.total_urls = len(urls)  # Saving total number of urls to database
             db.session.commit()
-
         # This will index all urls even if one fails
         for url in urls:
             try:
