@@ -57,7 +57,6 @@ class IndexedURL(db.Model):
     description = db.Column(db.Text, nullable=True)
     type = db.Column(db.String(50), nullable=True)
     sitemap_id = db.Column(db.Integer, db.ForeignKey('submitted_sitemap.id'), nullable=False)
-   
     def __init__(self, url, title, description, type, sitemap_id):
         self.url = url
         self.title = title
@@ -146,7 +145,7 @@ def index_sitemap(sitemap_url):
         sitemap.total_urls = len(urls)
         db.session.commit()
     for url in urls:
-        index_url(url, sitemap.id)  # Pass sitemap.id to index_url
+        index_url(url)
 
 def get_urls_from_sitemap(sitemap_url):
     response = requests.get(sitemap_url)
@@ -180,7 +179,7 @@ def get_urls_from_sitemap(sitemap_url):
 
     return urls
 
-def index_url(url, sitemap_id):  # Accepts sitemap_id as argument
+def index_url(url):
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()  # Will raise an HTTPError if the response was unsuccessful
@@ -196,13 +195,13 @@ def index_url(url, sitemap_id):  # Accepts sitemap_id as argument
     description_tag = soup.find("meta", attrs={"name": "description"})
     description = description_tag.get("content") if description_tag else "N/A"
 
-    indexed_url = IndexedURL(url=url, title=title, description=description, sitemap_id=sitemap_id)  # Set sitemap_id
+    indexed_url = IndexedURL(url=url, title=title, description=description)
 
     db.session.add(indexed_url)
     db.session.commit()
     print(f"Indexed {url}")
 
-    sitemap = SubmittedSitemap.query.get(sitemap_id)  # Use sitemap_id to get sitemap
+    sitemap = SubmittedSitemap.query.filter(SubmittedSitemap.url.contains(url.rsplit('/', 1)[0])).first()
     if sitemap:
         with lock:
             sitemap.indexed_urls += 1
@@ -214,12 +213,18 @@ def submit():
     if request.method == "POST":
         sitemap_url = request.form["sitemap_url"]
         new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='In queue', status='Not started', total_urls=0, indexed_urls=0)
-        db.session.add(new_sitemap)
-        db.session.commit()
-        SITEMAP_QUEUE.put(sitemap_url)
-        return redirect(url_for('submit'))
+        try:
+            db.session.add(new_sitemap)
+            db.session.commit()
+            SITEMAP_QUEUE.put(sitemap_url)
+            return redirect(url_for('submit'))
+        except Exception as e:
+            logging.error(f"An error occurred while saving the sitemap: {e}", exc_info=True)
+            flash("An error occurred while saving the sitemap. Please try again.")
+            return render_template("submit.html"), 500
     else:
         return render_template("submit.html")
+
 
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
