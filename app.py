@@ -60,15 +60,12 @@ def search():
         db.session.add(new_query)
         db.session.commit()
 
-        # Use SQLAlchemy's ilike function for case insensitive searching
         results = IndexedURL.query.filter(
-            or_(
-                IndexedURL.url.ilike(f"%{search_term}%"),
-                IndexedURL.title.ilike(f"%{search_term}%"),
-                IndexedURL.description.ilike(f"%{search_term}%")
-            )
+            IndexedURL.url.contains(search_term) |  # Change query to search_term
+            IndexedURL.title.contains(search_term) |  # Change query to search_term
+            IndexedURL.description.contains(search_term)  # Change query to search_term
         ).all()
-        return render_template('results.html', query=search_term, results=results)  
+        return render_template('results.html', query=search_term, results=results)  # Change query to search_term
     return render_template('search.html')
 
 def start_background_thread():
