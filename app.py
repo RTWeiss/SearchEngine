@@ -14,7 +14,9 @@ from datetime import datetime
 from models import db, IndexedURL
 from sqlalchemy import func
 from concurrent.futures import ThreadPoolExecutor
+from threading import Semaphore
 
+MAX_SIMULTANEOUS_INDEXING = 5
 
 DATABASE_URL = os.getenv('DATABASE_URL')
 
@@ -29,6 +31,9 @@ lock = Lock()
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
+
+executor = ThreadPoolExecutor(max_workers=MAX_SIMULTANEOUS_INDEXING)
+semaphore = Semaphore(MAX_SIMULTANEOUS_INDEXING)
 
 class SearchQuery(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -99,12 +104,11 @@ def update_sitemap(sitemap, status, total_urls=None, indexed_urls=None):
     db.session.commit()
 
 def process_sitemap_queue():
-    with ThreadPoolExecutor(max_workers=MAX_SIMULTANEOUS_INDEXING) as executor:
-        while not SITEMAP_QUEUE.empty() and CURRENTLY_INDEXING < MAX_SIMULTANEOUS_INDEXING:
-            sitemap_url = SITEMAP_QUEUE.get()
-            logging.info(f'Starting a new indexing thread for: {sitemap_url}')
-            increment_currently_indexing()
-            executor.submit(index_sitemap, sitemap_url)
+    while not SITEMAP_QUEUE.empty():
+        semaphore.acquire()
+        sitemap_url = SITEMAP_QUEUE.get()
+        logging.info(f'Starting a new indexing thread for: {sitemap_url}')
+        executor.submit(index_sitemap, sitemap_url)
 
 def index_sitemap(sitemap_url):
     try:
@@ -130,6 +134,7 @@ def index_sitemap(sitemap_url):
         logging.error(f"Error occurred in index_sitemap for {sitemap_url}: {e}", exc_info=True)
     finally:
         decrement_currently_indexing()
+        semaphore.release() 
 
 def get_urls_from_sitemap(sitemap_url):
     response = requests.get(sitemap_url)
@@ -184,16 +189,19 @@ def index_url(url, sitemap):
 def submit():
     if request.method == "POST":
         sitemap_url = request.form["sitemap_url"]
-        total_urls = len(get_urls_from_sitemap(sitemap_url)) # get total urls at this point
-        new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='Added to queue', status='Not started', total_urls=total_urls, indexed_urls=0)
+        total_urls = len(get_urls_from_sitemap(sitemap_url))  # get total urls at this point
+        new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='Added to queue', status='Not started',
+                                       total_urls=total_urls, indexed_urls=0)
         db.session.add(new_sitemap)
         db.session.commit()
         SITEMAP_QUEUE.put(sitemap_url)
-        
+
         # Update the status of the SubmittedSitemap
         with lock:
             new_sitemap.status = 'Started'
             db.session.commit()
+
+        executor.submit(process_sitemap_queue)  # submit to executor here
 
         flash("Sitemap submitted successfully.")
         return redirect(url_for('submit'))
