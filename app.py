@@ -153,8 +153,14 @@ def index_sitemap(sitemap_url, sitemap_id):
             sitemap.indexing_status = 'Indexing'
             sitemap.total_urls = len(urls)  # Saving total number of urls to database
             db.session.commit()
+
+        # This will index all urls even if one fails
         for url in urls:
-            index_url(url, sitemap.id)
+            try:
+                index_url(url, sitemap.id)
+            except Exception as e:
+                logging.error(f"An error occurred while indexing URL: {url}. Error: {str(e)}", exc_info=True)
+                
         if sitemap:
             sitemap.indexing_status = 'Completed'
             db.session.commit()
