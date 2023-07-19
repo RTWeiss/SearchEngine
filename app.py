@@ -31,7 +31,6 @@ lock = Lock()
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-Session = sessionmaker(bind=db.engine)
 executor = ThreadPoolExecutor(max_workers=MAX_SIMULTANEOUS_INDEXING)
 semaphore = Semaphore(MAX_SIMULTANEOUS_INDEXING)
 SITEMAP_QUEUE = queue.Queue()
@@ -133,18 +132,10 @@ def index_url(url, sitemap_id):
 
     indexed_url = IndexedURL(url=url, title=title, description=description, type=None, sitemap_id=sitemap_id)
 
-    session = Session()  # create a new session for this thread
-    try:
-        logging.info(f"Indexing URL: {url}")
-        session.add(indexed_url)
-        session.commit()
-        print(f"Indexed {url}")
-    except Exception as e:
-        session.rollback()
-        logging.error(f"Error occurred while indexing URL: {e}", exc_info=True)
-    finally:
-        session.close()
-
+    logging.info(f"Indexing URL: {url}")
+    db.session.add(indexed_url)
+    db.session.commit()
+    print(f"Indexed {url}")
 
 def update_sitemap(sitemap, status, total_urls=None, indexed_urls=None):
     with lock:
