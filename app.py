@@ -6,20 +6,18 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 from bs4 import BeautifulSoup
 import requests
 import urllib.parse
-from threading import Lock, Semaphore, Thread
+from threading import Lock
 import queue
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import escape
 from datetime import datetime
 from sqlalchemy import func
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from flask import copy_current_request_context
 from sqlalchemy.orm import sessionmaker
 
-
 MAX_SIMULTANEOUS_INDEXING = 5
 DATABASE_URL = os.getenv('DATABASE_URL')
-
 
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -33,7 +31,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 Session = sessionmaker(bind=db.engine)
 executor = ThreadPoolExecutor(max_workers=MAX_SIMULTANEOUS_INDEXING)
-semaphore = Semaphore(MAX_SIMULTANEOUS_INDEXING)
 SITEMAP_QUEUE = queue.Queue()
 
 logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
@@ -48,23 +45,15 @@ class SubmittedSitemap(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.Text, nullable=False)
     indexing_status = db.Column(db.String(100), nullable=False)
-    status = db.Column(db.String(100), nullable=False)  
     total_urls = db.Column(db.Integer, nullable=False)
-    indexed_urls = db.relationship('IndexedURL', backref='sitemap', lazy=True)  # Keep this line
+    indexed_urls = db.relationship('IndexedURL', backref='sitemap', lazy=True)
 
 class IndexedURL(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.Text, nullable=False)
     title = db.Column(db.String(500), nullable=True)
     description = db.Column(db.Text, nullable=True)
-    type = db.Column(db.String(50), nullable=True)
     sitemap_id = db.Column(db.Integer, db.ForeignKey('submitted_sitemap.id'), nullable=False)
-    def __init__(self, url, title, description, type, sitemap_id):
-        self.url = url
-        self.title = title
-        self.description = description
-        self.type = type
-        self.sitemap_id = sitemap_id
 
 with app.app_context():
     db.create_all()
@@ -306,7 +295,7 @@ def start_background_thread():
         time.sleep(5)
 
 def run_app():
-    thread = threading.Thread(target=process_sitemap_queue, daemon=True)
+    thread = threading.Thread(target=start_background_thread, daemon=True)
     thread.start()
     time.sleep(1)
     if not thread.is_alive():
