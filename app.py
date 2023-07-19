@@ -174,8 +174,6 @@ def index_sitemap(sitemap_url, sitemap_id):
             sitemap.indexing_status = 'Failed'
             db.session.commit()
 
-
-
 def process_sitemap_queue():
     while True:  # Change this to while True, it will be always checking the DB for sitemaps in queue.
         semaphore.acquire()  # Control the number of simultaneous indexings
@@ -187,7 +185,13 @@ def process_sitemap_queue():
         sitemap.indexing_status = 'Indexing'
         db.session.commit()
         try:
-            index_sitemap(sitemap.url, sitemap.id)  # Pass sitemap.id as well
+            with ThreadPoolExecutor(max_workers=MAX_SIMULTANEOUS_INDEXING) as executor:
+                futures = [executor.submit(index_url, url, sitemap.id) for url in get_urls_from_sitemap(sitemap.url)]
+                for future in as_completed(futures):
+                    try:
+                        future.result()
+                    except Exception as e:
+                        logging.error(f"An error occurred while indexing URL: {str(e)}", exc_info=True)
             sitemap.indexing_status = 'Completed'
             db.session.commit()
         except Exception as e:
