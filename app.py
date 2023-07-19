@@ -13,6 +13,8 @@ from werkzeug.utils import escape
 from datetime import datetime
 from models import db, IndexedURL
 from sqlalchemy import func
+from concurrent.futures import ThreadPoolExecutor
+
 
 DATABASE_URL = os.getenv('DATABASE_URL')
 
@@ -77,45 +79,57 @@ def start_background_thread():
             logging.error(f"Error occurred while processing sitemap queue: {e}", exc_info=True)
         time.sleep(5)
 
-def process_sitemap_queue():
+def increment_currently_indexing():
     global CURRENTLY_INDEXING
-    while not SITEMAP_QUEUE.empty() and CURRENTLY_INDEXING < MAX_SIMULTANEOUS_INDEXING:  # Consolidate condition checks
-        sitemap_url = SITEMAP_QUEUE.get()
-        logging.info(f'Starting a new indexing thread for: {sitemap_url}')
-        indexing_thread = threading.Thread(target=index_sitemap, args=(sitemap_url,))
-        indexing_thread.start()
-        with lock:
-            CURRENTLY_INDEXING += 1
-        logging.info(f'Started indexing thread for: {sitemap_url}')
+    with lock:
+        CURRENTLY_INDEXING += 1
 
-def index_sitemap(sitemap_url):
+def decrement_currently_indexing():
     global CURRENTLY_INDEXING
-    logging.info(f'Called index_sitemap for: {sitemap_url}')
-
-    urls = get_urls_from_sitemap(sitemap_url)
-    logging.info(f'Found {len(urls)} URLs in sitemap: {sitemap_url}')
-
-    sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
-    if sitemap:
-        with lock:
-            sitemap.total_urls = len(urls)
-            sitemap.indexing_status = 'Indexing'  
-            # moved indexed_url creation into the for loop to avoid referencing before assignment
-            db.session.commit()
-
-    for url in urls:
-        try:
-            index_url(url, sitemap)
-        except Exception as e:
-            logging.error(f"Error occurred while indexing URL {url}: {e}", exc_info=True)
-
     with lock:
         CURRENTLY_INDEXING -= 1
 
-        if sitemap:
-            sitemap.indexing_status = 'Completed'
-            db.session.commit()
+def update_sitemap(sitemap, status, total_urls=None, indexed_urls=None):
+    with lock:
+        sitemap.indexing_status = status
+        if total_urls is not None:
+            sitemap.total_urls = total_urls
+        if indexed_urls is not None:
+            sitemap.indexed_urls = indexed_urls
+    db.session.commit()
 
+def process_sitemap_queue():
+    with ThreadPoolExecutor(max_workers=MAX_SIMULTANEOUS_INDEXING) as executor:
+        while not SITEMAP_QUEUE.empty() and CURRENTLY_INDEXING < MAX_SIMULTANEOUS_INDEXING:
+            sitemap_url = SITEMAP_QUEUE.get()
+            logging.info(f'Starting a new indexing thread for: {sitemap_url}')
+            increment_currently_indexing()
+            executor.submit(index_sitemap, sitemap_url)
+
+def index_sitemap(sitemap_url):
+    try:
+        logging.info(f'Called index_sitemap for: {sitemap_url}')
+
+        urls = get_urls_from_sitemap(sitemap_url)
+        logging.info(f'Found {len(urls)} URLs in sitemap: {sitemap_url}')
+
+        sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
+        if sitemap:
+            update_sitemap(sitemap, 'Indexing', total_urls=len(urls))
+
+        for url in urls:
+            try:
+                index_url(url, sitemap)
+            except Exception as e:
+                logging.error(f"Error occurred while indexing URL {url}: {e}", exc_info=True)
+        
+        if sitemap:
+            update_sitemap(sitemap, 'Completed')
+
+    except Exception as e:
+        logging.error(f"Error occurred in index_sitemap for {sitemap_url}: {e}", exc_info=True)
+    finally:
+        decrement_currently_indexing()
 
 def get_urls_from_sitemap(sitemap_url):
     response = requests.get(sitemap_url)
