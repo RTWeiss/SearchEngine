@@ -158,7 +158,7 @@ def index_url(url, sitemap):
         description = page_soup.find("meta", attrs={"name": "description"})
         description = description["content"] if description else "No description available"
 
-        new_indexed_url = IndexedURL(url=url, title=title, description=description)
+        new_indexed_url = IndexedURL(url=url, title=title, description=description, type='sitemap') # Added type
         db.session.add(new_indexed_url)
         db.session.commit()
 
@@ -242,6 +242,6 @@ def run_app():
     thread = threading.Thread(target=start_background_thread)
     thread.start()
     app.run(debug=True, threaded=True)
-    
+
 if __name__ == "__main__":
     run_app()
