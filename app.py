@@ -43,7 +43,7 @@ class SearchQuery(db.Model):
 
 class SubmittedSitemap(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    url = db.Column(db.String(500), nullable=False)
+    url = db.Column(db.Text, nullable=False)
     indexing_status = db.Column(db.String(100), nullable=False)
     status = db.Column(db.String(100), nullable=False)  
     total_urls = db.Column(db.Integer, nullable=False)
@@ -51,7 +51,7 @@ class SubmittedSitemap(db.Model):
 
 class IndexedURL(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    url = db.Column(db.String(500), nullable=False)
+    url = db.Column(db.Text, nullable=False)
     title = db.Column(db.String(500), nullable=True)
     description = db.Column(db.Text, nullable=True)
     type = db.Column(db.String(50), nullable=True)
@@ -203,14 +203,14 @@ def index_url(url):
     sitemap = SubmittedSitemap.query.filter(SubmittedSitemap.url.contains(url.rsplit('/', 1)[0])).first()
     if sitemap:
         with lock:
-            sitemap.indexed_urls += 1
+            sitemap.total_urls += 1  # update total_urls
             db.session.commit()
 
 @app.route("/submit", methods=["GET", "POST"])
 def submit():
     if request.method == "POST":
         sitemap_url = request.form["sitemap_url"]
-        new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='In queue', status='Not started', total_urls=0, indexed_urls=0)
+        new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='In queue', status='Not started', total_urls=0)
         try:
             db.session.add(new_sitemap)
             db.session.commit()
