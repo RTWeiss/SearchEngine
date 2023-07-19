@@ -169,7 +169,7 @@ def index_url(url):
     if sitemap:
         sitemap.indexed_urls = SubmittedSitemap.indexed_urls + 1
         db.session.commit()
-        
+
 @app.route("/submit", methods=["GET", "POST"])
 def submit():
     if request.method == "POST":
@@ -206,7 +206,7 @@ def dashboard():
         total_pages = sum([sitemap.total_urls for sitemap in submitted_sitemaps])
         total_searches = SearchQuery.query.count()
 
-        return render_template('dashboard.html', total_pages=total_pages, search_queries=search_queries, sitemap_status=sitemap_status)
+        return render_template('dashboard.html', submitted_sitemaps=submitted_sitemaps)
     except Exception as e:
         logging.error(f"An error occurred while loading the dashboard: {e}", exc_info=True)
         return str(e), 500
