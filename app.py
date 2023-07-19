@@ -101,13 +101,11 @@ def increment_currently_indexing():
 def submit():
     if request.method == "POST":
         sitemap_url = request.form["sitemap_url"]
-        new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='In queue', status='Not started', total_urls=0)
+        new_sitemap = SubmittedSitemap(url=sitemap_url, indexing_status='In queue', status='In queue', total_urls=0)
         try:
             db.session.add(new_sitemap)
             db.session.commit()
-            semaphore.acquire()  # Control the number of simultaneous indexings
-            future = executor.submit(index_sitemap, sitemap_url, new_sitemap.id)  # call index_sitemap function here
-            future.add_done_callback(lambda x: semaphore.release())  # Release the semaphore when done
+            SITEMAP_QUEUE.put(sitemap_url)
             return redirect(url_for('submit'))
         except Exception as e:
             logging.error(f"An error occurred while saving the sitemap: {e}", exc_info=True)
