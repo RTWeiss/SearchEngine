@@ -132,10 +132,13 @@ def index_url(url, sitemap_id):
 
     indexed_url = IndexedURL(url=url, title=title, description=description, type=None, sitemap_id=sitemap_id)
 
-    logging.info(f"Indexing URL: {url}")
-    db.session.add(indexed_url)
-    db.session.commit()
+    with app.app_context():
+        db.session.add(indexed_url)
+        db.session.commit()
+
+    logging.info(f"Indexed URL: {url}")
     print(f"Indexed {url}")
+
 
 def update_sitemap(sitemap, status, total_urls=None, indexed_urls=None):
     with lock:
