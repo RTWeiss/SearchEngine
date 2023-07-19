@@ -257,28 +257,19 @@ def delete_sitemap():
 
 def process_sitemap_queue():
     while True:
-        sitemap = SubmittedSitemap.query.filter_by(indexing_status='In queue').first()
-        if not sitemap:
-            time.sleep(1)
-            continue
-        sitemap.indexing_status = 'Indexing'
-        db.session.commit()
-        try:
-            index_sitemap(sitemap.url, sitemap.id)
-        except Exception as e:
-            logging.error(f"Error occurred while indexing sitemap: {e}", exc_info=True)
-            sitemap.indexing_status = 'Failed'
-            db.session.commit()
-
-def decrement_currently_indexing():
-    global CURRENTLY_INDEXING
-    with lock:
-        CURRENTLY_INDEXING -= 1
-
-def increment_currently_indexing():
-    global CURRENTLY_INDEXING
-    with lock:
-        CURRENTLY_INDEXING += 1
+        if not SITEMAP_QUEUE.empty():
+            sitemap_url = SITEMAP_QUEUE.get()
+            sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
+            if sitemap:
+                sitemap.indexing_status = 'Indexing'
+                db.session.commit()
+                try:
+                    index_sitemap(sitemap_url, sitemap.id)
+                except Exception as e:
+                    logging.error(f"Error occurred while indexing sitemap: {e}", exc_info=True)
+                    sitemap.indexing_status = 'Failed'
+                    db.session.commit()
+        time.sleep(5)
 
 def start_background_thread():
     while True:
@@ -291,7 +282,7 @@ def start_background_thread():
         time.sleep(5)
 
 def run_app():
-    thread = threading.Thread(target=process_sitemap_queue, daemon=True)
+    thread = threading.Thread(target=start_background_thread, daemon=True)  # target=start_background_thread
     thread.start()
     time.sleep(1)
     if not thread.is_alive():
