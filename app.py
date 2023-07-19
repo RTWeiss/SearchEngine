@@ -240,9 +240,11 @@ def delete_sitemap():
 def run_app():
     thread = threading.Thread(target=start_background_thread, daemon=True)
     thread.start()
+    time.sleep(1)  # Add this line
     if not thread.is_alive():
         logging.error("Background thread failed to start.")
     app.run(debug=True, threaded=True)
+
 
 if __name__ == "__main__":
     run_app()
