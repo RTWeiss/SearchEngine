@@ -58,7 +58,7 @@
           {% for sitemap_url, data in sitemap_status.items() %}
           <tr>
             <td class="sitemap-url">{{ sitemap_url }}</td>
-            <td>{{ data['status'] }}</td>
+            <td>{{ data['indexing_status'] }}</td>
             <td><center>{{ data['total_urls'] }}</center></td>
             <td><center>{{ data['indexed_urls'] }}</center></td>
             <td>
