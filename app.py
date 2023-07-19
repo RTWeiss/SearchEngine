@@ -161,45 +161,36 @@ def index_sitemap(sitemap_url, sitemap_id):
         urls = get_urls_from_sitemap(sitemap_url)
         indexed_urls = []
         for url in urls:
-            index_url(url, sitemap_id)  # Index each URL using the index_url function
+            index_url(url, sitemap_id)
+            indexed_urls.append(url)
             
         sitemap = SubmittedSitemap.query.get(sitemap_id)
         if sitemap:
-            sitemap.indexing_status = 'Completed'
-            db.session.commit()
+            update_sitemap(sitemap, 'Completed', indexed_urls=indexed_urls)
     except Exception as e:
         logging.error(f"An error occurred while indexing sitemap: {sitemap_url}. Error: {str(e)}", exc_info=True)
         sitemap = SubmittedSitemap.query.get(sitemap_id)
         if sitemap:
-            sitemap.indexing_status = 'Failed'
-            db.session.commit()
+            update_sitemap(sitemap, 'Failed')
 
 def process_sitemap_queue():
-    while True:  # Change this to while True, it will be always checking the DB for sitemaps in queue.
-        semaphore.acquire()  # Control the number of simultaneous indexings
-        sitemap = SubmittedSitemap.query.filter_by(indexing_status='In queue').first()  # Fetch next sitemap in queue from the database
-        if not sitemap:  # If no sitemap found, release semaphore, sleep and continue the loop
+    while True:
+        semaphore.acquire()
+        sitemap = SubmittedSitemap.query.filter_by(indexing_status='In queue').first()
+        if not sitemap:
             semaphore.release()
             time.sleep(1)
             continue
         sitemap.indexing_status = 'Indexing'
         db.session.commit()
         try:
-            with ThreadPoolExecutor(max_workers=MAX_SIMULTANEOUS_INDEXING) as executor:
-                futures = [executor.submit(index_url, url, sitemap.id) for url in get_urls_from_sitemap(sitemap.url)]
-                for future in as_completed(futures):
-                    try:
-                        future.result()
-                    except Exception as e:
-                        logging.error(f"An error occurred while indexing URL: {str(e)}", exc_info=True)
-            sitemap.indexing_status = 'Completed'
-            db.session.commit()
+            index_sitemap(sitemap.url, sitemap.id)
         except Exception as e:
             logging.error(f"Error occurred while indexing sitemap: {e}", exc_info=True)
             sitemap.indexing_status = 'Failed'
             db.session.commit()
         finally:
-            semaphore.release()  # Release the semaphore after indexing is completed
+            semaphore.release()
 
 def index_url(url, sitemap_id):
     try:
