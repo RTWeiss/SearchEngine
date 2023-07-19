@@ -197,7 +197,7 @@ def index_sitemap(sitemap_url):
     for url in urls:
         index_url(url, sitemap)
 
-def index_url(url, sitemap, indexed_count):  # sitemap argument added here
+def index_url(url, sitemap):  # sitemap argument added here
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()  # Will raise an HTTPError if the response was unsuccessful
@@ -217,11 +217,8 @@ def index_url(url, sitemap, indexed_count):  # sitemap argument added here
 
     db.session.add(indexed_url)
     db.session.commit()
-    indexed_count += 1  # Increment indexed_count after successful commit
     print(f"Indexed {url}")
-    if sitemap:
-        update_sitemap(sitemap, 'Indexing', indexed_urls=indexed_count)  # Update indexed_urls
-
+    
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
     try:
@@ -230,7 +227,7 @@ def dashboard():
             sitemap.url: {
                 'indexing_status': sitemap.indexing_status,
                 'total_urls': sitemap.total_urls,
-                'indexed_urls': len(sitemap.indexed_urls),  # Use the length of indexed_urls
+                'indexed_urls': IndexedURL.query.filter_by(sitemap_id=sitemap.id).count(),  # Use SQLAlchemy query to count indexed urls
             }
             for sitemap in submitted_sitemaps
         }
