@@ -185,14 +185,12 @@ def submit():
 def index_sitemap(sitemap_url, sitemap_id):
     try:
         urls = get_urls_from_sitemap(sitemap_url)
-        indexed_urls = []
         for url in urls:
             index_url(url, sitemap_id)
-            indexed_urls.append(url)
             
         sitemap = SubmittedSitemap.query.get(sitemap_id)
         if sitemap:
-            update_sitemap(sitemap, 'Completed', indexed_urls=indexed_urls)
+            update_sitemap(sitemap, 'Completed')
     except Exception as e:
         logging.error(f"An error occurred while indexing sitemap: {sitemap_url}. Error: {str(e)}", exc_info=True)
         sitemap = SubmittedSitemap.query.get(sitemap_id)
@@ -256,10 +254,8 @@ def delete_sitemap():
 
 def process_sitemap_queue():
     while True:
-        semaphore.acquire()
         sitemap = SubmittedSitemap.query.filter_by(indexing_status='In queue').first()
         if not sitemap:
-            semaphore.release()
             time.sleep(1)
             continue
         sitemap.indexing_status = 'Indexing'
@@ -270,9 +266,7 @@ def process_sitemap_queue():
             logging.error(f"Error occurred while indexing sitemap: {e}", exc_info=True)
             sitemap.indexing_status = 'Failed'
             db.session.commit()
-        finally:
-            semaphore.release()
-            
+
 def decrement_currently_indexing():
     global CURRENTLY_INDEXING
     with lock:
@@ -294,7 +288,7 @@ def start_background_thread():
         time.sleep(5)
 
 def run_app():
-    thread = threading.Thread(target=process_sitemap_queue, daemon=True)  # Changed the target function
+    thread = threading.Thread(target=process_sitemap_queue, daemon=True)
     thread.start()
     time.sleep(1)
     if not thread.is_alive():
