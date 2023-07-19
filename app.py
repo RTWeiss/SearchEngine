@@ -48,6 +48,7 @@ class SubmittedSitemap(db.Model):
     status = db.Column(db.String(100), nullable=False)
     total_urls = db.Column(db.Integer, nullable=False)
     indexed_urls = db.Column(db.Integer, nullable=True)
+    indexed_urls = db.relationship('IndexedURL', backref='sitemap', lazy=True)
 
 class IndexedURL(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -55,12 +56,14 @@ class IndexedURL(db.Model):
     title = db.Column(db.String(500), nullable=True)
     description = db.Column(db.Text, nullable=True)
     type = db.Column(db.String(50), nullable=True)
-    
-    def __init__(self, url, title, description, type):
+    sitemap_id = db.Column(db.Integer, db.ForeignKey('submitted_sitemap.id'), nullable=False)
+   
+    def __init__(self, url, title, description, type, sitemap_id):
         self.url = url
         self.title = title
         self.description = description
         self.type = type
+        self.sitemap_id = sitemap_id
 
 with app.app_context():
     db.create_all()
@@ -143,7 +146,7 @@ def index_sitemap(sitemap_url):
         sitemap.total_urls = len(urls)
         db.session.commit()
     for url in urls:
-        index_url(url)
+        index_url(url, sitemap.id)  # Pass sitemap.id to index_url
 
 def get_urls_from_sitemap(sitemap_url):
     response = requests.get(sitemap_url)
@@ -177,7 +180,7 @@ def get_urls_from_sitemap(sitemap_url):
 
     return urls
 
-def index_url(url):
+def index_url(url, sitemap_id):  # Accepts sitemap_id as argument
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()  # Will raise an HTTPError if the response was unsuccessful
@@ -193,13 +196,13 @@ def index_url(url):
     description_tag = soup.find("meta", attrs={"name": "description"})
     description = description_tag.get("content") if description_tag else "N/A"
 
-    indexed_url = IndexedURL(url=url, title=title, description=description)
+    indexed_url = IndexedURL(url=url, title=title, description=description, sitemap_id=sitemap_id)  # Set sitemap_id
 
     db.session.add(indexed_url)
     db.session.commit()
     print(f"Indexed {url}")
 
-    sitemap = SubmittedSitemap.query.filter(SubmittedSitemap.url.contains(url.rsplit('/', 1)[0])).first()
+    sitemap = SubmittedSitemap.query.get(sitemap_id)  # Use sitemap_id to get sitemap
     if sitemap:
         with lock:
             sitemap.indexed_urls += 1
