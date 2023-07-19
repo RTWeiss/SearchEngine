@@ -45,7 +45,7 @@ class SubmittedSitemap(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.String(500), nullable=False)
     indexing_status = db.Column(db.String(100), nullable=False)
-    status = db.Column(db.String(100), nullable=False)  # Add this line
+    status = db.Column(db.String(100), nullable=False)  
     total_urls = db.Column(db.Integer, nullable=False)
     indexed_urls = db.relationship('IndexedURL', backref='sitemap', lazy=True)  # Keep this line
 
@@ -138,7 +138,7 @@ def process_sitemap_queue():
 def index_sitemap(sitemap_url):
     response = requests.get(sitemap_url)
     soup = BeautifulSoup(response.text, "xml")
-    urls = [url.text for url in soup.find_all("loc")]
+    urls = get_urls_from_sitemap(sitemap_url)
     sitemap = SubmittedSitemap.query.filter_by(url=sitemap_url).first()
     if sitemap:
         sitemap.total_urls = len(urls)
