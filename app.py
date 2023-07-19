@@ -71,10 +71,11 @@ def search():
 def start_background_thread():
     while True:
         try:
-            sitemap_url = SITEMAP_QUEUE.get()  # This will block until an item is available
-            process_sitemap_queue(sitemap_url)
+            if not SITEMAP_QUEUE.empty():
+                process_sitemap_queue()
         except Exception as e:
             logging.error(f"Error occurred while processing sitemap queue: {e}", exc_info=True)
+        time.sleep(5)
 
 def process_sitemap_queue():
     global CURRENTLY_INDEXING
@@ -247,9 +248,12 @@ def delete_sitemap():
     return redirect(url_for('dashboard'))
 
 def run_app():
-    thread = threading.Thread(target=start_background_thread)
+    thread = threading.Thread(target=start_background_thread, daemon=True) # adding daemon=True
     thread.start()
+    if not thread.is_alive():  # checking if thread is not alive
+        logging.error("Background thread failed to start.")  # logging an error if the thread failed to start
     app.run(debug=True, threaded=True)
+
 
 if __name__ == "__main__":
     run_app()
