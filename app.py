@@ -4,18 +4,15 @@ import time
 from flask import Flask, render_template, request, redirect, url_for, flash
 from bs4 import BeautifulSoup
 import requests
-import threading
 import urllib.parse
-from threading import Lock
+from threading import Lock, Semaphore, Thread
 import queue
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import escape
 from datetime import datetime
 from sqlalchemy import func
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from threading import Semaphore
 from flask import copy_current_request_context
-
 
 MAX_SIMULTANEOUS_INDEXING = 5
 DATABASE_URL = os.getenv('DATABASE_URL')
@@ -67,8 +64,6 @@ class IndexedURL(db.Model):
 with app.app_context():
     db.create_all()
 
-SITEMAP_QUEUE = queue.Queue()
-MAX_SIMULTANEOUS_INDEXING = 5
 CURRENTLY_INDEXING = 0
 
 logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
