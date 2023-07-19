@@ -154,7 +154,7 @@ def index_sitemap(sitemap_url, sitemap_id):
             sitemap.total_urls = len(urls)  # Update total_urls
             db.session.commit()
         for url in urls:
-            index_url(url, sitemap)  # Pass sitemap object here
+            index_url(url, sitemap.id)  # Pass sitemap_id here
         if sitemap:
             sitemap.indexing_status = 'Completed'  # Update status after indexing is done
             db.session.commit()
@@ -165,7 +165,7 @@ def index_sitemap(sitemap_url, sitemap_id):
             sitemap.indexing_status = 'Failed'
             db.session.commit()
 
-def index_url(url, sitemap):  # sitemap argument added here
+def index_url(url, sitemap_id):  # sitemap argument is sitemap_id here
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()  # Will raise an HTTPError if the response was unsuccessful
@@ -180,10 +180,10 @@ def index_url(url, sitemap):  # sitemap argument added here
     description_tag = soup.find("meta", attrs={"name": "description"})
     description = description_tag.get("content") if description_tag else "N/A"
 
-    indexed_url = IndexedURL(url=url, title=title, description=description, sitemap_id=sitemap.id)  # Added sitemap.id here
+    indexed_url = IndexedURL(url=url, title=title, description=description, type=None, sitemap_id=sitemap_id)  # Added type=None here
 
     db.session.add(indexed_url)
-    db.session.commit()
+    db.session.commit()  # Commit the changes here
     print(f"Indexed {url}")
 
 def get_urls_from_sitemap(sitemap_url):
